@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Tuition Manager</title>
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#5b8def">
+<meta name="theme-color" content="#0a0a0e">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -47,6 +47,12 @@
   --shadow:inset 0 1px 0 var(--glass-highlight);
   --blur:16px;
   --ease:cubic-bezier(.22,1,.36,1);
+  /* Bottom sheets/modals sit on top of a dimmed backdrop
+     (.sheet-overlay, rgba(0,0,0,.5)) — they need a near-opaque
+     surface of their own so that dimming never bleeds through
+     and reduces text contrast. Deliberately NOT the low-opacity
+     --glass-fill-strong token used for in-page cards. */
+  --sheet-bg:rgba(24,25,34,.98);
 }
 html[data-theme="light"]{
   color-scheme:light;
@@ -58,6 +64,7 @@ html[data-theme="light"]{
   --glass-border:rgba(20,20,30,.12);
   --glass-highlight:rgba(255,255,255,.5);
   --surface-solid:#ffffff;
+  --sheet-bg:rgba(255,255,255,.98);
   --text:#15161C;
   --muted:rgba(21,22,28,.55);
   --accent:#5A6ECF;
@@ -217,6 +224,8 @@ select{-webkit-appearance:none;appearance:none;background-image:url("data:image/
 }
 .drawer-overlay.open .drawer{transform:translateX(0)}
 .drawer-brand{display:flex;align-items:center;gap:10px;padding:6px 10px;margin-bottom:14px}
+.drawer-profile-btn{width:36px;height:36px;border-radius:50%;background:var(--surface3);color:var(--accent);display:grid;place-items:center;flex:none;font-size:13px;font-weight:500;overflow:hidden;border:1px solid var(--line)}
+.drawer-profile-btn img{width:100%;height:100%;object-fit:cover;border-radius:50%}
 .drawer-brand b{display:block;font-size:14px;font-weight:500}
 .drawer-brand span{display:block;font-size:11px;color:var(--muted);font-weight:400}
 .drawer-collapse-btn{display:none;margin-left:auto;width:30px;height:30px;border-radius:10px;background:var(--surface2);border:1px solid var(--line);align-items:center;justify-content:center;flex:none;color:var(--muted)}
@@ -296,12 +305,14 @@ select{-webkit-appearance:none;appearance:none;background-image:url("data:image/
     display:grid;gap:14px;align-items:start;
     grid-template-columns:2fr 1fr;
     grid-template-areas:
+      "quickactions quickactions"
       "quote quote"
       "chart chart"
       "glance glance"
       "setup setup"
       "activity activity";
   }
+  .home-bento>.bento-quick-actions{grid-area:quickactions;margin-bottom:0}
   .home-bento>.bento-quote{grid-area:quote;margin-bottom:0}
   .home-bento>.bento-chart{grid-area:chart;margin-bottom:0}
   .home-bento>.bento-glance{grid-area:glance;margin-bottom:0}
@@ -312,6 +323,7 @@ select{-webkit-appearance:none;appearance:none;background-image:url("data:image/
   .home-bento{
     grid-template-columns:1.3fr 1fr 1fr;
     grid-template-areas:
+      "quickactions quickactions quickactions"
       "quote quote chart"
       "glance glance chart"
       "setup setup setup"
@@ -328,6 +340,17 @@ select{-webkit-appearance:none;appearance:none;background-image:url("data:image/
   .glance-grid{grid-template-columns:repeat(3,1fr)}
   .report-grid,.detail-grid,.transaction-card .grid,.test-sheet-meta{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
   .quick-grid{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+  /* Tile/grid view (Students, Tests, Payments): the base rule sizes
+     columns off viewport width (clamp(...,45vw,...)), which is meant
+     for portrait phones and collapses to a single column once the
+     available container width narrows relative to that vw-based
+     minimum (e.g. narrow landscape windows, split-screen, small
+     tablets). Landscape has width to spare, so size columns off a
+     fixed, container-relative minimum instead — guarantees at least
+     2-3 columns regardless of exactly how wide "landscape" is. */
+  #studentsListWrap.tile-mode .student-list{grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}
+  #testsListWrap.tile-mode{grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}
+  #paymentsListWrap.tile-mode .tx-day-items{grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}
 }
 @media (orientation:landscape) and (min-width:900px) and (max-width:1099px){
   .view{max-width:1080px}
@@ -335,10 +358,9 @@ select{-webkit-appearance:none;appearance:none;background-image:url("data:image/
 
 /* ---------- Home dashboard (READ-ONLY — no forms, no create/edit actions) ---------- */
 .home-header{
-  position:sticky;top:0;z-index:20;display:flex;flex-direction:column;gap:4px;
+  position:static;display:flex;flex-direction:column;gap:4px;
   margin:-20px -18px 18px;padding:calc(env(safe-area-inset-top,0px) + 18px) 18px 14px;
-  background:rgba(var(--bg-rgb),.72);backdrop-filter:blur(20px) saturate(140%);-webkit-backdrop-filter:blur(20px) saturate(140%);
-  border-bottom:1px solid transparent;transition:border-color .2s;
+  border-bottom:1px solid transparent;
 }
 .home-header.scrolled{border-bottom-color:var(--line)}
 .home-header-row{display:flex;align-items:flex-start;gap:12px}
@@ -431,10 +453,10 @@ select{-webkit-appearance:none;appearance:none;background-image:url("data:image/
    CHUNK 2 — Students module
    ============================================================ */
 .tab-header{
-  position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:10px;
-  margin:-20px -18px 16px;padding:calc(env(safe-area-inset-top,0px) + 20px) 18px 14px;
-  background:rgba(var(--bg-rgb),.72);backdrop-filter:blur(20px) saturate(140%);-webkit-backdrop-filter:blur(20px) saturate(140%);
-  border-bottom:1px solid transparent;transition:border-color .2s;
+  position:static;display:flex;align-items:center;justify-content:space-between;gap:10px;
+  flex-wrap:wrap;row-gap:10px;
+  margin:-20px -18px 16px;padding:calc(env(safe-area-inset-top,0px) + 28px) 18px 14px;
+  border-bottom:1px solid transparent;
 }
 .tab-header.scrolled{border-bottom-color:var(--line)}
 .tab-header h1{font-size:24px;font-weight:300;letter-spacing:-.02em;margin:0}
@@ -620,7 +642,7 @@ select{-webkit-appearance:none;appearance:none;background-image:url("data:image/
 
 /* ---------- Bottom sheet (used sparingly — reminder amount only) ---------- */
 .sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:150;display:flex;align-items:flex-end;justify-content:center}
-.sheet{background:var(--glass-fill-strong);width:min(600px,100%);border-radius:28px 28px 0 0;padding:10px 20px calc(20px + env(safe-area-inset-bottom,0px));box-shadow:inset 0 1px 0 var(--glass-highlight);border:1px solid var(--glass-border);border-bottom:none;max-height:80vh;overflow-y:auto}
+.sheet{background:var(--sheet-bg);width:min(600px,100%);border-radius:28px 28px 0 0;padding:10px 20px calc(20px + env(safe-area-inset-bottom,0px));box-shadow:inset 0 1px 0 var(--glass-highlight);border:1px solid var(--glass-border);border-bottom:none;max-height:80vh;overflow-y:auto}
 .sheet-grip{width:36px;height:4px;border-radius:var(--radius-pill);background:var(--line);margin:6px auto 14px}
 .sheet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
 .sheet-head h3{margin:0;font-size:16px;font-weight:500}
@@ -719,6 +741,61 @@ select{-webkit-appearance:none;appearance:none;background-image:url("data:image/
 .range-choice-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
 .range-choice{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:10px 6px;text-align:center;font-size:12px;font-weight:500}
 .range-choice.active{background:color-mix(in srgb, var(--accent) 85%, transparent);border-color:var(--accent);color:var(--accent-text)}
+
+/* ---------- Quick Actions (Home) ---------- */
+.quick-actions-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+@media(min-width:1100px){.quick-actions-grid{grid-template-columns:repeat(4,1fr)}}
+.quick-action-tile{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:16px 10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;font-size:12.5px;font-weight:500;min-height:92px}
+.quick-action-tile .qa-icon{width:42px;height:42px;border-radius:14px;background:var(--surface3);color:var(--accent);display:grid;place-items:center}
+.quick-action-tile:active{background:var(--surface2)}
+
+/* ---------- Universal search ---------- */
+.universal-search-wrap{position:relative}
+.universal-search-wrap input{width:100%}
+.universal-search-results{margin-top:8px}
+.search-section+.search-section{margin-top:10px}
+.search-section-title{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding:6px 8px 4px}
+
+/* ---------- Class colour dot ---------- */
+.class-color-dot{width:9px;height:9px;border-radius:50%;flex:none;margin-right:-2px;box-shadow:0 0 0 2px var(--surface-solid)}
+.student-row .class-color-dot,.activity-row .class-color-dot{margin-right:2px}
+.color-swatch-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.color-swatch-btn{width:28px;height:28px;border-radius:50%;border:2px solid transparent;padding:0;cursor:pointer;display:grid;place-items:center;color:#fff;font-size:13px}
+.color-swatch-btn.active{border-color:var(--text)}
+.color-swatch-btn.none{background:var(--surface3);color:var(--muted);border:1px dashed var(--line)}
+
+/* ---------- Day / night toggle (Settings) ---------- */
+.daynight-toggle{position:relative;width:60px;height:32px;border-radius:999px;background:var(--surface3);border:1px solid var(--line);flex:none;padding:3px}
+.daynight-toggle .knob{width:24px;height:24px;border-radius:50%;background:var(--accent);color:var(--accent-text);display:grid;place-items:center;transition:transform .25s var(--ease);transform:translateX(0)}
+.daynight-toggle.is-dark .knob{transform:translateX(28px)}
+.daynight-toggle svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.settings-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0}
+.settings-row b{display:block;font-size:13.5px;font-weight:500}
+.settings-row small{display:block;font-size:11.5px;color:var(--muted);margin-top:2px}
+
+/* ---------- Teacher profile page (Instagram-style) ---------- */
+.tprofile-hero{display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;margin-bottom:18px}
+.tprofile-photo-wrap{position:relative;width:96px;height:96px;margin-bottom:10px}
+.tprofile-photo{width:96px;height:96px;border-radius:50%;background:var(--surface3);color:var(--accent);display:grid;place-items:center;font-weight:300;font-size:30px;object-fit:cover;overflow:hidden;border:2px solid var(--line)}
+.tprofile-photo img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.tprofile-photo-edit{position:absolute;right:-2px;bottom:-2px;width:30px;height:30px;border-radius:50%;background:var(--accent);color:var(--accent-text);display:grid;place-items:center;border:2px solid var(--surface-solid)}
+.tprofile-hero h1{margin:6px 0 0;font-size:20px;letter-spacing:-.02em}
+.tprofile-hero p{margin:2px 0 0;font-size:13px;color:var(--muted)}
+.tprofile-social-row{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:10px}
+.tprofile-social-link{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:500;color:var(--text);background:var(--surface2);border-radius:var(--radius-pill);padding:7px 13px}
+.tprofile-social-link svg{width:16px;height:16px;flex:none}
+.qr-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-card);padding:16px 18px;margin-bottom:14px;text-align:center}
+.qr-preview{width:150px;height:150px;border-radius:16px;background:var(--surface2);margin:10px auto;display:grid;place-items:center;overflow:hidden;border:1px solid var(--line)}
+.qr-preview img{width:100%;height:100%;object-fit:contain}
+.qr-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px}
+
+/* ---------- Backup/Restore button icon alignment ---------- */
+.backup-main-btn{justify-content:flex-start}
+.backup-main-btn .backup-icon{margin-left:0}
+
+/* ---------- List/Grid toggle: desktop only ---------- */
+.list-view-toggle-btn{display:none}
+@media(min-width:1100px){.list-view-toggle-btn{display:inline-flex}}
 </style>
 </head>
 <body>
@@ -734,6 +811,9 @@ select{-webkit-appearance:none;appearance:none;background-image:url("data:image/
 <div id="drawerOverlay" class="drawer-overlay" onclick="if(event.target===this)closeDrawer()">
   <nav id="drawer" class="drawer">
     <div class="drawer-brand">
+      <button type="button" class="drawer-profile-btn" title="Your profile" aria-label="Your profile" onclick="closeDrawer();showTeacherProfilePage()">
+        ${state.teacherPhotoDataUrl?`<img src="${state.teacherPhotoDataUrl}" alt="">`:`<span>${esc(initials(state.teacher||state.brand||"T"))}</span>`}
+      </button>
       <div><b id="drawerBrandName"></b><span id="drawerBrandSub"></span></div>
       <button type="button" class="drawer-collapse-btn" title="Collapse sidebar" aria-label="Collapse sidebar" onclick="collapseDesktopSidebar()">
         <svg viewBox="0 0 24 24"><path d="M15 4v16M9 4v16M4 4h16v16H4z"/></svg>
@@ -751,9 +831,33 @@ select{-webkit-appearance:none;appearance:none;background-image:url("data:image/
       <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18M7 15h4"/></svg>
       <span>Payments</span>
     </button>
-    <button type="button" class="nav-btn" data-tab="more" onclick="closeDrawer();showTab('more')">
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20c.8-3.6 3.3-5.5 7.5-5.5s6.7 1.9 7.5 5.5"/></svg>
-      <span>More</span>
+    <button type="button" class="nav-btn" data-tab="tests" onclick="closeDrawer();showTab('tests')">
+      <svg viewBox="0 0 24 24"><path d="M6 3.5h12v17H6z"/><path d="M9 7h6M9 11h6M9 15h3"/></svg>
+      <span>Tests</span>
+    </button>
+    <button type="button" class="nav-btn" onclick="closeDrawer();showAttendanceHub()">
+      <svg viewBox="0 0 24 24"><path d="M4 5h16v15H4z"/><path d="M4 9h16M8 3v4M16 3v4"/><path d="m8.5 13 2 2 4-4"/></svg>
+      <span>Attendance</span>
+    </button>
+    <button type="button" class="nav-btn" onclick="closeDrawer();showClassesPage()">
+      <svg viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 13 9 5 9-5"/></svg>
+      <span>Classes</span>
+    </button>
+    <button type="button" class="nav-btn" onclick="closeDrawer();showBackupPage()">
+      <svg viewBox="0 0 24 24"><path d="M7 17a5 5 0 0 1-1-9.9 6 6 0 0 1 11.4-1.6A4.5 4.5 0 0 1 17 17H7Z"/><path d="M12 11v7M9.5 15.5 12 18l2.5-2.5"/></svg>
+      <span>Backup &amp; Restore</span>
+    </button>
+    <button type="button" class="nav-btn" onclick="closeDrawer();showSettingsPage()">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>
+      <span>Settings</span>
+    </button>
+    <button type="button" class="nav-btn" onclick="closeDrawer();showAboutPage()">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/></svg>
+      <span>About &amp; Help</span>
+    </button>
+    <button type="button" class="nav-btn" onclick="closeDrawer();installAppNow()">
+      <svg viewBox="0 0 24 24"><path d="M12 3v13"/><path d="M6.5 11.5 12 17l5.5-5.5"/><path d="M4 20h16"/></svg>
+      <span>Install App</span>
     </button>
   </nav>
 </div>
@@ -882,6 +986,9 @@ const DEFAULT_STATE={
   setupDone:false, loggedOut:false, theme:"system", accentHue:217, appFont:"system", listView:"list",
   teacher:"", brand:"", gender:"",
   teacherWhatsapp:"", teacherInstagram:"", teacherYoutube:"",
+  teacherEmail:"", teacherAddress:"", teacherPhotoDataUrl:"",
+  qrCodeDataUrl:"", upiId:"",
+  classColors:{},
   sessionStart:"", sessionEnd:"",
   classes:[], activeClass:"All", retiredClasses:[], classGroupLinks:{},
   students:[], leftStudentTransactions:[], tests:[], lastDriveSync:"",
@@ -961,6 +1068,15 @@ function normalizeState(){
   if(!Array.isArray(state.retiredClasses))state.retiredClasses=[];
   if(!state.classGroupLinks||typeof state.classGroupLinks!=="object")state.classGroupLinks={};
   if(!["light","dark","system"].includes(state.theme))state.theme="system";
+  if(state.theme==="system"){
+    state.theme=(window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches)?"light":"dark";
+  }
+  if(typeof state.teacherEmail!=="string")state.teacherEmail="";
+  if(typeof state.teacherAddress!=="string")state.teacherAddress="";
+  if(typeof state.teacherPhotoDataUrl!=="string")state.teacherPhotoDataUrl="";
+  if(typeof state.qrCodeDataUrl!=="string")state.qrCodeDataUrl="";
+  if(typeof state.upiId!=="string")state.upiId="";
+  if(!state.classColors||typeof state.classColors!=="object")state.classColors={};
   if(!Number.isFinite(state.accentHue)){
     state.accentHue=state.accent&&LEGACY_ACCENT_HUES[state.accent]!==undefined?LEGACY_ACCENT_HUES[state.accent]:217;
   }
@@ -1010,6 +1126,29 @@ function normalizeState(){
 /* ---------- Student/class helpers (single source of truth: memberships) ---------- */
 function activeMemberships(s){return (s.memberships||[]).filter(m=>m.status!=="inactive");}
 function studentHasClass(s,cls){return cls==="All"?true:activeMemberships(s).some(m=>m.class===cls);}
+/* ---------- Class colour-coding ----------
+   One colour per class, picked from a curated palette that's been
+   tuned to stay readable on both the light and dark surfaces this
+   app uses — so it never fights with the rest of the UI. Once set,
+   the colour follows every student in that class everywhere they
+   appear (student list, overdue fees, activity, payments, etc). */
+const CLASS_COLOR_PALETTE=["#FF6B6B","#FF922B","#F7C948","#6BCB77","#38B6FF","#4D96FF","#9775FA","#F783AC","#20C997","#868E96"];
+function classColorFor(className){
+  if(!className)return "";
+  return (state.classColors&&state.classColors[className])||"";
+}
+function setClassColor(className,color){
+  if(!state.classColors)state.classColors={};
+  if(color)state.classColors[className]=color;else delete state.classColors[className];
+  save();
+  const top=pageStack[pageStack.length-1];
+  if(top&&top.fn===classesPageHTML)replacePage(classesPageHTML);
+}
+function classColorDotHTML(s){
+  const c=classColorFor(primaryClass(s));
+  if(!c)return "";
+  return `<span class="class-color-dot" style="background:${c}" title="${esc(primaryClass(s))}"></span>`;
+}
 function primaryClass(s){const m=activeMemberships(s)[0]||s.memberships?.[0];return m?m.class:"";}
 function membershipLabel(s){
   const ms=activeMemberships(s);
@@ -1063,7 +1202,7 @@ function hamburgerBtnHTML(){
    width the browser window happens to be. */
 function listViewToggleHTML(){
   const isTile=state.listView==="tile";
-  return `<button type="button" class="btn btn-light btn-small" title="${isTile?"Switch to list view":"Switch to tile view"}" aria-label="Toggle view" onclick="toggleListView()" style="display:inline-flex;align-items:center;gap:5px">
+  return `<button type="button" class="btn btn-light btn-small list-view-toggle-btn" title="${isTile?"Switch to list view":"Switch to tile view"}" aria-label="Toggle view" onclick="toggleListView()" style="align-items:center;gap:5px">
     ${isTile
       ? `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>`
       : `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.3"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.3"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.3"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.3"/></svg>`}
@@ -1171,8 +1310,15 @@ function applyTheme(){
   root.style.setProperty("--bg-grad",mode==="light"
     ? `radial-gradient(120% 100% at 15% 0%, hsl(${hue} 55% 94%), #f7f8fc 55%, #ffffff)`
     : `radial-gradient(120% 100% at 15% 0%, hsl(${hue} 28% 22%), #14151d 55%, #0a0a0e)`);
+  /* Status bar: match the app's actual background per theme (not the
+     accent colour — a bright accent chip looked like a fixed, jarring
+     bar regardless of light/dark mode). Also flip the iOS status-bar
+     text style so dark text shows over the light background. */
+  const statusBarColor=mode==="light"?"#f7f8fc":"#0a0a0e";
   const meta=document.querySelector('meta[name="theme-color"]');
-  if(meta)meta.setAttribute("content",bg);
+  if(meta)meta.setAttribute("content",statusBarColor);
+  const appleStatus=document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+  if(appleStatus)appleStatus.setAttribute("content",mode==="light"?"default":"black-translucent");
 }
 if(window.matchMedia){
   const mq=window.matchMedia("(prefers-color-scheme: light)");
@@ -1463,7 +1609,6 @@ const tab_renderers={
   students:studentsTabHTML,
   tests:testsTabHTML,
   payments:paymentsTabHTML,
-  more:moreTabHTML
 };
 function placeholderHTML(title,note,pathData){
   return `<div class="tab-header">${esc(title)}</div>
@@ -1900,7 +2045,7 @@ async function backupNowFromNotif(){
 }
 function goToTeacherProfileFromNotif(){
   profileEditingOpen=true;
-  showSettingsPage();
+  showTeacherProfilePage();
 }
 function showIncompleteProfilesPage(){showPage(incompleteProfilesPageHTML);}
 function incompleteProfilesPageHTML(){
@@ -1986,8 +2131,10 @@ function recentActivity(limit){
 }
 function activityRowHTML(a){
   const itemId=a.kind==="payment"?a.txId:a.kind==="test"?a.testId:"";
+  const owner=a.studentId?state.students.find(x=>x.id===a.studentId):null;
   return `
   <div class="activity-row" role="button" tabindex="0" onclick="openActivityItem('${a.kind}','${esc(a.studentId||"")}','${esc(itemId||"")}')" onkeydown="if(event.key==='Enter')openActivityItem('${a.kind}','${esc(a.studentId||"")}','${esc(itemId||"")}')">
+    ${owner?classColorDotHTML(owner):""}
     <div class="activity-icon">${activityIcon(a.kind)}</div>
     <div class="activity-main"><div class="activity-title">${esc(a.title)}</div><div class="activity-sub">${esc(a.sub)}</div></div>
     ${a.kind==="payment"?`<div class="activity-amount">+${money(a.amount)}</div>`:""}
@@ -2013,24 +2160,118 @@ function activityIcon(kind){
   return `<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.5-3.1 2.3-5 5.5-5s5 1.9 5.5 5"/><path d="M17 6v6M14 9h6"/></svg>`;
 }
 /* ---------- Overdue Fees widget ----------
-   Surfaces the 4 active students furthest behind on fees directly on
-   Home — reuses the same balanceFor()/whatsappRemindStudent() the
-   Students tab already has, just proactively instead of making the
-   teacher go dig through the student list to find who to chase. */
-function overdueStudentsList(){
-  return state.students.filter(isActive)
+   Surfaces active students who haven't paid anything *this calendar
+   month* and still owe a balance — reuses the same
+   balanceFor()/whatsappRemindStudent() the Students tab already has,
+   just proactively instead of making the teacher go dig through the
+   student list to find who to chase. Home shows the top 4 (by
+   balance); "Tap to show more" opens the full list, same pattern as
+   Recent Activity. */
+function hasPaidThisMonth(s){
+  const ym=currentMonthKey();
+  return (s.transactions||[]).some(t=>monthKeyOf(t.date)===ym);
+}
+function overdueStudentsList(limit){
+  const list=state.students.filter(isActive)
+    .filter(s=>!hasPaidThisMonth(s))
     .map(s=>({s,bal:balanceFor(s)}))
     .filter(x=>x.bal>0)
-    .sort((a,b)=>b.bal-a.bal)
-    .slice(0,4);
+    .sort((a,b)=>b.bal-a.bal);
+  return Number.isFinite(limit)?list.slice(0,limit):list;
 }
 function overdueRowHTML({s,bal}){
-  return `<div class="activity-row" role="button" tabindex="0" onclick="whatsappRemindStudent('${esc(s.id)}')" onkeydown="if(event.key==='Enter')whatsappRemindStudent('${esc(s.id)}')">
+  return `<div class="activity-row" role="button" tabindex="0" onclick="showPaymentFormPage('${esc(s.id)}')" onkeydown="if(event.key==='Enter')showPaymentFormPage('${esc(s.id)}')">
+    ${classColorDotHTML(s)}
     <div class="activity-icon" style="color:var(--danger)"><svg viewBox="0 0 24 24"><path d="M6 9a6 6 0 0 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 13 6 9Z"/><path d="M9.5 17a2.5 2.5 0 0 0 5 0"/></svg></div>
-    <div class="activity-main"><div class="activity-title">${esc(s.name)}</div><div class="activity-sub">${esc(membershipLabel(s))}</div></div>
-    <div class="activity-amount" style="color:var(--danger)">${money(bal)}</div>
+    <div class="activity-main"><div class="activity-title">${esc(s.name)}</div><div class="activity-sub">${esc(primaryClass(s)||"—")}</div></div>
   </div>`;
 }
+function showAllOverduePage(){showPage(allOverduePageHTML);}
+function allOverduePageHTML(){
+  const overdue=overdueStudentsList();
+  return `
+    <div class="page-head"><button type="button" class="btn back-btn" onclick="goBack()">‹</button><div><div class="page-title">Overdue Fees</div><div class="page-sub">${overdue.length} student${overdue.length===1?"":"s"} haven't paid this month</div></div></div>
+    ${overdue.length?`<div class="activity-panel"><div class="activity-list">${overdue.map(overdueRowHTML).join("")}</div></div>`:`<div class="empty-note">Nobody's overdue right now.</div>`}
+  `;
+}
+/* ============================================================
+   UNIVERSAL SEARCH — one box, searches students, payments and
+   tests together. Results come back already grouped so the caller
+   can render them as separate labelled rows/sections.
+   ============================================================ */
+function universalSearch(qRaw){
+  const q=String(qRaw||"").trim().toLowerCase();
+  if(!q)return {q:"",students:[],payments:[],tests:[]};
+  const students=state.students.filter(s=>
+    `${s.name||""} ${s.father||""} ${s.mother||""} ${s.admissionNo||""} ${membershipLabel(s)}`.toLowerCase().includes(q)
+  ).slice(0,6);
+  const payments=[];
+  state.students.forEach(s=>(s.transactions||[]).forEach(t=>{
+    const hay=`${s.name||""} ${t.mode||""} ${t.remark||""} ${t.amount||""}`.toLowerCase();
+    if(hay.includes(q))payments.push({s,t});
+  }));
+  payments.sort((a,b)=>new Date(b.t.date)-new Date(a.t.date));
+  const tests=state.tests.filter(t=>`${t.name||""} ${t.subject||""} ${t.class||""}`.toLowerCase().includes(q)).slice(0,6);
+  return {q,students,payments:payments.slice(0,6),tests};
+}
+function universalSearchResultsHTML(qRaw){
+  const r=universalSearch(qRaw);
+  if(!r.q)return "";
+  const total=r.students.length+r.payments.length+r.tests.length;
+  if(!total)return `<div class="empty-note">No matches for "${esc(r.q)}".</div>`;
+  const section=(title,rowsHtml)=>rowsHtml?`<div class="search-section"><div class="search-section-title">${esc(title)}</div>${rowsHtml}</div>`:"";
+  const studentRows=r.students.map(s=>`
+    <div class="activity-row" role="button" tabindex="0" onclick="showProfilePage('${esc(s.id)}')">
+      ${classColorDotHTML(s)}
+      <div class="activity-icon">${avatarHTML(s.name,36)}</div>
+      <div class="activity-main"><div class="activity-title">${esc(s.name)}</div><div class="activity-sub">${esc(membershipLabel(s))}</div></div>
+    </div>`).join("");
+  const paymentRows=r.payments.map(({s,t})=>`
+    <div class="activity-row" role="button" tabindex="0" onclick="showPaymentFormPage('${esc(s.id)}','${esc(t.id)}')">
+      <div class="activity-icon">${activityIcon("payment")}</div>
+      <div class="activity-main"><div class="activity-title">${esc(s.name)}</div><div class="activity-sub">${esc(t.mode||"Payment")} · ${fmtDate(t.date)}</div></div>
+      <div class="activity-amount">+${money(t.amount)}</div>
+    </div>`).join("");
+  const testRows=r.tests.map(t=>`
+    <div class="activity-row" role="button" tabindex="0" onclick="showTestDetailPage('${esc(t.id)}')">
+      <div class="activity-icon">${activityIcon("test")}</div>
+      <div class="activity-main"><div class="activity-title">${esc(t.name)}</div><div class="activity-sub">${esc(t.class||"")}${t.subject?" · "+esc(t.subject):""}</div></div>
+    </div>`).join("");
+  return `<div class="activity-panel universal-search-results">
+    ${section(`Students (${r.students.length})`,studentRows)}
+    ${section(`Payments (${r.payments.length})`,paymentRows)}
+    ${section(`Tests (${r.tests.length})`,testRows)}
+  </div>`;
+}
+function onUniversalSearchInput(){
+  const val=document.getElementById("universalSearchInput")?.value||"";
+  const out=document.getElementById("universalSearchResults");
+  if(out)out.innerHTML=universalSearchResultsHTML(val);
+}
+
+/* ---------- Quick Actions (Home) ---------- */
+function quickActionsHTML(){
+  return `<div class="section-title"><h3>Quick Actions</h3></div>
+    <div class="quick-actions-grid">
+      <button type="button" class="quick-action-tile" onclick="showStudentFormPage()">
+        <span class="qa-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.5-3.1 2.3-5 5.5-5s5 1.9 5.5 5"/><path d="M17 6v6M14 9h6"/></svg></span>
+        <span>Add Student</span>
+      </button>
+      <button type="button" class="quick-action-tile" onclick="showSelectStudentPage()">
+        <span class="qa-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M16 7.5c-.7-1.4-2-2.2-4-2.2-2.3 0-3.8 1.2-3.8 2.8 0 4.7 7.6 2.1 7.6 6.5 0 1.7-1.5 3-4 3-2 0-3.5-.8-4.3-2.3"/></svg></span>
+        <span>Record Payment</span>
+      </button>
+      <button type="button" class="quick-action-tile" onclick="showAddTestPage()">
+        <span class="qa-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h12v17H6z"/><path d="M9 7h6M9 11h6M9 15h3"/></svg></span>
+        <span>Add Test Record</span>
+      </button>
+      <button type="button" class="quick-action-tile" onclick="showAttendanceHub()">
+        <span class="qa-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v15H4z"/><path d="M4 9h16M8 3v4M16 3v4"/><path d="m8.5 13 2 2 4-4"/></svg></span>
+        <span>Add Attendance</span>
+      </button>
+    </div>`;
+}
+
 function homeTabHTML(){
   const f=homeFigures();
   const activity=recentActivity(3);
@@ -2054,7 +2295,8 @@ function homeTabHTML(){
   const chartTitle=sessionSeries?"Session Progress":"Fees Collected";
   const chartTag=sessionSeries?`${cPct(sessionPct)} of session · tap a month`:"Last 6 months · tap a month";
   const momInit=momBadgeData(homeFeeChartSelIdx);
-  const overdue=overdueStudentsList();
+  const overdueAll=overdueStudentsList();
+  const overdue=overdueAll.slice(0,4);
   return `
     <div class="home-header">
       <div class="home-header-row">
@@ -2066,7 +2308,14 @@ function homeTabHTML(){
       </div>
     </div>
 
+    <div class="search-wrap universal-search-wrap">
+      <input id="universalSearchInput" placeholder="Search students, payments, tests…" oninput="onUniversalSearchInput()">
+      <div id="universalSearchResults"></div>
+    </div>
+
     <div class="home-bento">
+      <div class="bento-quick-actions">${quickActionsHTML()}</div>
+
       <div class="quote-card bento-quote">
         <div class="home-quote-text">"${esc(quote.q)}"</div>
         <div class="home-quote-author">- ${esc(quote.a)}</div>
@@ -2097,8 +2346,10 @@ function homeTabHTML(){
       ${(!state.setupDone||!state.classes.length)?`<div class="setup-banner bento-setup"><b>Finish setup</b><span>Add your classes to get going.</span></div>`:""}
 
       ${overdue.length?`<div class="bento-overdue">
-        <div class="section-title"><h3>Overdue Fees</h3><span class="month-card-tag">${overdue.length} student${overdue.length===1?"":"s"}</span></div>
-        <div class="activity-panel"><div class="activity-list">${overdue.map(overdueRowHTML).join("")}</div></div>
+        <div class="section-title"><h3>Overdue Fees</h3><span class="month-card-tag">${overdueAll.length} student${overdueAll.length===1?"":"s"}</span></div>
+        <div class="activity-panel"><div class="activity-list">${overdue.map(overdueRowHTML).join("")}</div>
+          ${overdueAll.length>overdue.length?`<button type="button" class="activity-more-btn" onclick="showAllOverduePage()">Tap to show more</button>`:""}
+        </div>
       </div>`:""}
 
       <div class="bento-activity">
@@ -2224,7 +2475,7 @@ function renderStudentsList(){
       <button type="button" class="student-row" onclick="showProfilePage('${esc(s.id)}')">
         ${avatarHTML(s.name,44)}
         <div class="student-main">
-          <div class="student-name">${esc(s.name)}</div>
+          <div class="student-name">${classColorDotHTML(s)}${esc(s.name)}</div>
           <div class="student-meta">${s.admissionNo?`Adm. No. ${esc(s.admissionNo)} · `:""}${esc(membershipLabel(s))}</div>
         </div>
         <span class="chevron">›</span>
@@ -2641,8 +2892,9 @@ function openStudentTransactionsSheet(studentId){
    one set of element IDs, so the duplicate-ID class of bug
    from earlier builds cannot happen here by construction.
    ============================================================ */
-async function shareText(text){
+async function shareText(text,qrDataUrl){
   haptic();
+  if(qrDataUrl&&await tryShareWithQr(text,qrDataUrl))return;
   if(navigator.share){try{await navigator.share({text});return;}catch(e){if(e&&e.name==="AbortError")return;}}
   try{await navigator.clipboard.writeText(text);notify("Copied. Paste it into WhatsApp or any other app.");}
   catch(e){window.prompt("Copy this text:",text);}
@@ -3187,32 +3439,86 @@ async function sendReminder(studentId){
   const amount=Number(document.getElementById("reminderAmount")?.value);
   if(!Number.isFinite(amount)||amount<0)return notify("Enter a valid amount.","error");
   closeSheet();
-  await deliverFeeMessage(s,amount);
+  if(state.qrCodeDataUrl||state.upiId){askQrChoiceThenSend(studentId,amount);return;}
+  await deliverFeeMessage(s,amount,null);
+}
+/* Fee reminders can optionally carry the teacher's payment QR code +
+   UPI ID — ask which one to use (or skip) before sending. */
+function askQrChoiceThenSend(studentId,amount){
+  const hasDefault=!!state.qrCodeDataUrl;
+  openSheet("Include Payment QR?",`
+    <div class="choice-list">
+      ${hasDefault?`<button type="button" class="btn choice-item" onclick="closeSheet();deliverFeeMessageFor('${esc(studentId)}',${amount},'default')">
+        <b>Use Saved QR Code</b><span>Your default QR + UPI ID</span></button>`:""}
+      <label class="btn choice-item" style="cursor:pointer">
+        <b>Upload a QR Code</b><span>Just for this message</span>
+        <input type="file" accept="image/*" style="display:none" onchange="uploadQrThenSend('${esc(studentId)}',${amount},this)">
+      </label>
+      <button type="button" class="btn choice-item" onclick="closeSheet();deliverFeeMessageFor('${esc(studentId)}',${amount},'none')">
+        <b>Without QR Code</b><span>Send the text reminder only</span></button>
+    </div>
+  `);
+}
+async function uploadQrThenSend(studentId,amount,input){
+  const file=input.files&&input.files[0];if(!file)return;
+  closeSheet();
+  try{
+    const dataUrl=await fileToResizedDataURL(file,500);
+    await deliverFeeMessageFor(studentId,amount,"upload",dataUrl);
+  }catch(e){notify("Could not read that image.","error");}
+}
+async function deliverFeeMessageFor(studentId,amount,choice,uploadedDataUrl){
+  const s=state.students.find(x=>x.id===studentId);if(!s)return;
+  const qrDataUrl=choice==="default"?state.qrCodeDataUrl:choice==="upload"?uploadedDataUrl:null;
+  await deliverFeeMessage(s,amount,choice==="none"?null:qrDataUrl);
 }
 /* Where the message actually goes: exactly one contact number → straight
    to WhatsApp for that number. Several numbers → ask which one first.
    No number on file at all → hand it to the device's own share sheet so
    the teacher picks the app and the recipient themselves. */
-async function deliverFeeMessage(s,amount){
+async function deliverFeeMessage(s,amount,qrDataUrl){
   const paid=paidFor(s);
   const feeLine=isMonthlyFeeStudent(s)?`Fees / Month: ${money(s.monthlyFee)}`:`Total Fees: ${money(s.totalFees)}`;
-  const text=`Dear Parent,\n\nFee update for ${s.name} (${membershipLabel(s)}):\n${feeLine}\nPaid till date: ${money(paid)}\nAmount requested (${monthLabel(currentMonthKey())}): ${money(amount)}\n\nKindly pay at the earliest convenience.\n— ${state.teacher||state.brand||"Tuition Manager"}`;
+  let text=`Dear Parent,\n\nFee update for ${s.name} (${membershipLabel(s)}):\n${feeLine}\nPaid till date: ${money(paid)}\nAmount requested (${monthLabel(currentMonthKey())}): ${money(amount)}\n\nKindly pay at the earliest convenience.`;
+  if(qrDataUrl&&state.upiId)text+=`\n\nPay via UPI: ${state.upiId}\n(QR code attached)`;
+  else if(qrDataUrl)text+=`\n\n(QR code attached)`;
+  text+=`\n— ${state.teacher||state.brand||"Tuition Manager"}`;
   const numbers=(s.contacts||[]).filter(Boolean);
   haptic();
-  if(!numbers.length){await shareText(text);return;}
-  if(numbers.length===1){openWhatsAppTo(numbers[0],text);return;}
+  if(!numbers.length){await shareText(text,qrDataUrl);return;}
+  if(numbers.length===1){await openWhatsAppTo(numbers[0],text,qrDataUrl);return;}
   openSheet("Send To Which Number?",`
     <div class="choice-list">${numbers.map((n,i)=>`
-      <button type="button" class="btn choice-item" onclick="closeSheet();openWhatsAppTo('${esc(n).replace(/'/g,"&#039;")}',${JSON.stringify(text)})">
+      <button type="button" class="btn choice-item" onclick="closeSheet();openWhatsAppTo('${esc(n).replace(/'/g,"&#039;")}',${JSON.stringify(text)},${JSON.stringify(qrDataUrl||"")})">
         <b>${iconGlyph("phone")}Contact ${i+1}</b><span>${esc(n)}</span>
       </button>`).join("")}
     </div>
   `);
 }
-function openWhatsAppTo(phone,text){
+function dataUrlToFile(dataUrl,filename){
+  const [meta,b64]=dataUrl.split(",");
+  const mime=(meta.match(/data:(.*);base64/)||[])[1]||"image/jpeg";
+  const bin=atob(b64);
+  const bytes=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+  return new File([bytes],filename,{type:mime});
+}
+async function tryShareWithQr(text,qrDataUrl){
+  if(!qrDataUrl||!navigator.canShare||!navigator.share)return false;
+  try{
+    const file=dataUrlToFile(qrDataUrl,"payment-qr.jpg");
+    if(!navigator.canShare({files:[file]}))return false;
+    await navigator.share({files:[file],text});
+    return true;
+  }catch(e){return e&&e.name==="AbortError"?true:false;}
+}
+async function openWhatsAppTo(phone,text,qrDataUrl){
+  if(qrDataUrl&&await tryShareWithQr(text,qrDataUrl))return;
   const wa=toWhatsAppNumber(phone);
-  if(wa){window.open(`https://wa.me/${wa}?text=${encodeURIComponent(text)}`,"_blank","noopener");notify("Reminder ready to send.");}
-  else shareText(text);
+  if(wa){
+    window.open(`https://wa.me/${wa}?text=${encodeURIComponent(text)}`,"_blank","noopener");
+    notify(qrDataUrl?"Reminder ready — attach the QR code manually before sending.":"Reminder ready to send.");
+  }else shareText(text,qrDataUrl);
 }
 
 /* ============================================================
@@ -3529,13 +3835,12 @@ function markAttendancePageHTML(cls,dateISO){
   const isHoliday=month.holidays.includes(dateISO);
   const dayRecord=month.records[dateISO]||{};
   return `
-    <div class="page-head"><button type="button" class="btn back-btn" onclick="goBack()">‹</button><div><div class="page-title">Mark Attendance</div><div class="page-sub">${esc(cls)}</div></div></div>
+    <div class="page-head"><button type="button" class="btn back-btn" onclick="goBack()">‹</button><div style="flex:1"><div class="page-title">Mark Attendance</div><div class="page-sub">${esc(cls)}</div></div>
+      <button type="button" class="btn btn-light btn-small" style="margin-left:auto" onclick="showAttendanceSummaryPage('${esc(cls)}','${esc(ym)}')">Monthly Summary</button>
+    </div>
     <div class="attendance-topline">
       <div class="field"><label>Class</label><select onchange="showMarkAttendancePage(this.value,'${esc(dateISO)}')">${state.classes.map(c=>`<option value="${esc(c)}" ${c===cls?"selected":""}>${esc(c)}</option>`).join("")}</select></div>
       <div class="field"><label>Date</label><input type="date" value="${esc(dateISO)}" max="${todayISO()}" onchange="showMarkAttendancePage('${esc(cls)}',this.value)"></div>
-    </div>
-    <div class="form-actions">
-      <button type="button" class="btn btn-light btn-block" onclick="showAttendanceSummaryPage('${esc(cls)}','${esc(ym)}')">Monthly Summary</button>
     </div>
     ${isHoliday?`
       <div class="holiday-banner"><span><b>Tuition Off</b> — this date is excluded from attendance.</span>
@@ -3545,13 +3850,13 @@ function markAttendancePageHTML(cls,dateISO){
         ${Object.keys(dayRecord).length?`<button type="button" class="btn btn-small btn-light" onclick="redoAttendanceDay('${esc(cls)}','${esc(dateISO)}')">Redo Day</button>`:""}
         <button type="button" class="btn btn-small" onclick="toggleHoliday('${esc(cls)}','${esc(dateISO)}')">Tuition Off</button>
       </div>
+      <div class="field-help" style="margin:-2px 0 10px">Everyone is assumed present. Tap a student only to mark them Absent.</div>
       ${roster.length?`
       <div>${roster.map(s=>{
         const status=dayRecord[s.id]||"";
-        return `<div class="att-row"><div class="att-name">${esc(s.name)}</div>
+        return `<div class="att-row"><div class="att-name">${classColorDotHTML(s)}${esc(s.name)}</div>
           <div class="attendance-choice">
-            <button type="button" class="attendance-status-btn ${status==="present"?"selected-present":""}" onclick="setAttStatus('${esc(cls)}','${esc(dateISO)}','${esc(s.id)}','present')">Present</button>
-            <button type="button" class="attendance-status-btn ${status==="absent"?"selected-absent":""}" onclick="setAttStatus('${esc(cls)}','${esc(dateISO)}','${esc(s.id)}','absent')">Absent</button>
+            <button type="button" class="attendance-status-btn ${status==="absent"?"selected-absent":""}" onclick="setAttStatus('${esc(cls)}','${esc(dateISO)}','${esc(s.id)}','absent')">${status==="absent"?"Absent":"Mark Absent"}</button>
           </div></div>`;
       }).join("")}</div>
       <div class="form-actions"><button type="button" class="btn btn-primary btn-block" onclick="saveAttendanceForDate('${esc(cls)}','${esc(dateISO)}')">Save Attendance</button></div>
@@ -3582,6 +3887,13 @@ function redoAttendanceDay(cls,dateISO){
 }
 async function saveAttendanceForDate(cls,dateISO){
   const ym=monthKeyOf(dateISO),month=attCache[cls+":"+ym];if(!month)return;
+  if(!month.records[dateISO])month.records[dateISO]={};
+  const dayRecord=month.records[dateISO];
+  /* Only absentees need an explicit tap — everyone else in the roster
+     is assumed present, so fill them in automatically before saving. */
+  activeStudentsForClass(cls).forEach(s=>{
+    if(dayRecord[s.id]!=="absent")dayRecord[s.id]="present";
+  });
   const ok=await saveAttendanceMonth(cls,ym,{holidays:month.holidays,records:month.records});
   if(!ok)return;
   haptic();notify("Attendance saved for "+fmtDate(dateISO)+".");
@@ -3688,11 +4000,21 @@ function classesPageHTML(){
       <h2>Your Classes</h2>
       ${classes.length?classes.map(c=>{
         const count=state.students.filter(s=>isActive(s)&&studentHasClass(s,c)).length;
-        return `<div class="class-manager-row"><div><b>${esc(c)}</b><small>${count} active student${count===1?"":"s"}</small></div>
-          <div class="class-manager-actions">
-            <button type="button" class="btn btn-small" onclick="openRenameClassSheet('${esc(c).replace(/'/g,"&#039;")}')">Rename</button>
-            <button type="button" class="btn btn-small btn-danger" onclick="retireClass('${esc(c).replace(/'/g,"&#039;")}')">Retire</button>
-          </div></div>`;
+        const escC=esc(c).replace(/'/g,"&#039;");
+        const current=classColorFor(c);
+        return `<div class="class-manager-row" style="flex-direction:column;align-items:stretch;gap:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+            <div>${current?`<span class="class-color-dot" style="background:${current}"></span>`:""}<b>${esc(c)}</b><small>${count} active student${count===1?"":"s"}</small></div>
+            <div class="class-manager-actions">
+              <button type="button" class="btn btn-small" onclick="openRenameClassSheet('${escC}')">Rename</button>
+              <button type="button" class="btn btn-small btn-danger" onclick="retireClass('${escC}')">Retire</button>
+            </div>
+          </div>
+          <div class="color-swatch-row">
+            <button type="button" class="color-swatch-btn none ${current?"":"active"}" title="No colour" onclick="setClassColor('${escC}','')">✕</button>
+            ${CLASS_COLOR_PALETTE.map(hex=>`<button type="button" class="color-swatch-btn ${current===hex?"active":""}" style="background:${hex}" title="${hex}" onclick="setClassColor('${escC}','${hex}')">${current===hex?"✓":""}</button>`).join("")}
+          </div>
+        </div>`;
       }).join(""):`<div class="empty-note">No classes yet. Add your first one below.</div>`}
     </section>
     <section class="form-section">
@@ -3739,6 +4061,7 @@ async function submitRenameClass(oldName){
   state.students.forEach(s=>(s.memberships||[]).forEach(m=>{if(m.class===oldName)m.class=name;}));
   state.tests.forEach(t=>{if(t.class===oldName)t.class=name;});
   if(state.classGroupLinks[oldName]!==undefined){state.classGroupLinks[name]=state.classGroupLinks[oldName];delete state.classGroupLinks[oldName];}
+  if(state.classColors&&state.classColors[oldName]!==undefined){state.classColors[name]=state.classColors[oldName];delete state.classColors[oldName];}
   if(state.activeClass===oldName)state.activeClass=name;
   await migrateAttendanceClassName(oldName,name);
   if(!await save())return;
@@ -3885,44 +4208,29 @@ function removePaymentMode(i){
   if(top&&top.fn===settingsPageHTML)replacePage(settingsPageHTML);
 }
 function showSettingsPage(){showPage(settingsPageHTML);}
+function toggleDayNight(){
+  setThemePreference(resolvedTheme()==="dark"?"light":"dark");
+}
 function settingsPageHTML(){
-  const themes=[
-    ["system",`<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>`,"System","Follow device"],
-    ["light",`<circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>`,"Light","Bright"],
-    ["dark",`<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"/>`,"Dark","Dim"]
-  ];
+  const isDark=resolvedTheme()==="dark";
   return `
-    <div class="page-head"><button type="button" class="btn back-btn" onclick="goBack()">‹</button><div><div class="page-title">Settings</div><div class="page-sub">Profile, appearance &amp; session</div></div></div>
-    <section class="form-section">
-      <div class="section-head">
-        <h2>Profile</h2>
-        <div style="display:flex;gap:8px">
-          <button type="button" class="btn btn-light btn-small" title="Edit Profile" onclick="toggleProfileEdit()"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9a2.1 2.1 0 0 0-4-4L4 16v4Z"/></svg></button>
-          <button type="button" class="btn btn-light btn-small" title="Log out (your data stays safe)" onclick="logoutApp()"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg></button>
-        </div>
-      </div>
-      <div id="profileSection">${profileSectionInnerHTML()}</div>
-    </section>
+    <div class="page-head"><button type="button" class="btn back-btn" onclick="goBack()">‹</button><div><div class="page-title">Settings</div><div class="page-sub">Appearance, backup &amp; data</div></div></div>
     <section class="form-section">
       <h2>Appearance</h2>
-      <div class="theme-choice-grid">${themes.map(([key,ic,label,sub])=>`
-        <button type="button" class="theme-choice ${state.theme===key?"active":""}" onclick="setThemePreference('${key}')">
-          <span class="ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ic}</svg></span><b>${label}</b><small>${sub}</small>
-        </button>`).join("")}</div>
-      <div class="accent-label">Accent colour</div>
+      <div class="settings-row">
+        <div><b>${isDark?"Dark mode":"Light mode"}</b><small>Switch between light and dark</small></div>
+        <button type="button" class="daynight-toggle ${isDark?"is-dark":""}" aria-label="Toggle light/dark" onclick="toggleDayNight()">
+          <span class="knob">${isDark
+            ?`<svg viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"/></svg>`
+            :`<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/></svg>`}</span>
+        </button>
+      </div>
+      <div class="accent-label" style="margin-top:14px">Accent colour</div>
       <div class="accent-swatch-grid">${ACCENT_HUES.map((hue,i)=>{
         const active=closestAccentHue(state.accentHue)===hue;
         return `<button type="button" class="accent-swatch ${active?"active":""}" style="--sw:${accentColorFor(hue,resolvedTheme()).bg}" title="${ACCENT_HUE_NAMES[i]||"Hue "+hue}" onclick="setAccentHuePreference(${hue})">${active?"✓":""}</button>`;
       }).join("")}</div>
-      <div class="field-help" style="margin-top:8px">Tap a colour to apply it — tap it again any time to switch straight back.</div>
-    </section>
-    <section class="form-section">
-      <h2>App Font</h2>
-      <div class="theme-choice-grid">${APP_FONTS.map(([key,label,sample])=>`
-        <button type="button" class="theme-choice ${(state.appFont||"system")===key?"active":""}" style="font-family:${sample}" onclick="setAppFontPreference('${key}')">
-          <b style="font-family:${sample}">Aa</b><small>${label}</small>
-        </button>`).join("")}</div>
-      <div class="field-help" style="margin-top:8px">Changes the font used across the whole app.</div>
+      <div class="field-help" style="margin-top:8px">Each colour is tuned separately for light and dark mode, so it always stays easy to read. Tap a colour to apply it.</div>
     </section>
     <section class="form-section">
       <h2>Payment Modes</h2>
@@ -3933,6 +4241,15 @@ function settingsPageHTML(){
         <input id="newModeInput" placeholder="e.g. UPI2, Cheque" onkeydown="if(event.key==='Enter'){event.preventDefault();addPaymentMode()}">
         <button type="button" class="btn btn-light" onclick="addPaymentMode()">Add</button>
       </div>
+    </section>
+    <section class="form-section">
+      <h2>Backup &amp; Data</h2>
+      <div class="field-help" style="margin-bottom:10px">Export, import or reset all your data.</div>
+      ${notifRow({icon:`<path d="M7 17a5 5 0 0 1-1-9.9 6 6 0 0 1 11.4-1.6A4.5 4.5 0 0 1 17 17H7Z"/><path d="M12 11v7M9.5 15.5 12 18l2.5-2.5"/>`,title:"Backup &amp; Restore",sub:"Export or restore your full data",action:"showBackupPage()"})}
+    </section>
+    <section class="form-section">
+      ${notifRow({icon:`<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/>`,title:"About &amp; Help",sub:"A quick guide to the whole app",action:"showAboutPage()"})}
+      ${notifRow({icon:`<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>`,title:"Log Out",sub:"Your data stays safely on this device",action:"logoutApp()"})}
     </section>
     <div class="danger-zone">
       <h2>Master Reset</h2>
@@ -3945,34 +4262,125 @@ function settingsPageHTML(){
 let profileEditingOpen=false;
 function toggleProfileEdit(open){
   profileEditingOpen=open===undefined?!profileEditingOpen:open;
-  const el=document.getElementById("profileSection");
-  if(el)el.innerHTML=profileSectionInnerHTML();
+  const top=pageStack[pageStack.length-1];
+  if(top&&top.fn===teacherProfilePageHTML)replacePage(teacherProfilePageHTML);
 }
-function profileSectionInnerHTML(){
+/* Reads an <input type=file> image, downsizes it to a sane max
+   dimension via canvas, and hands back a data: URL — keeps the
+   photo/QR small enough to store comfortably in IndexedDB/localStorage. */
+function fileToResizedDataURL(file,maxDim){
+  return new Promise((resolve,reject)=>{
+    if(!file)return reject(new Error("no file"));
+    const reader=new FileReader();
+    reader.onerror=()=>reject(reader.error);
+    reader.onload=()=>{
+      const img=new Image();
+      img.onerror=()=>reject(new Error("bad image"));
+      img.onload=()=>{
+        let {width:w,height:h}=img;
+        if(w>maxDim||h>maxDim){
+          const scale=maxDim/Math.max(w,h);
+          w=Math.round(w*scale);h=Math.round(h*scale);
+        }
+        const canvas=document.createElement("canvas");
+        canvas.width=w;canvas.height=h;
+        canvas.getContext("2d").drawImage(img,0,0,w,h);
+        resolve(canvas.toDataURL("image/jpeg",0.86));
+      };
+      img.src=reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+async function pickTeacherPhoto(input){
+  const file=input.files&&input.files[0];if(!file)return;
+  try{
+    state.teacherPhotoDataUrl=await fileToResizedDataURL(file,400);
+    await save();
+    syncDrawerBrand();
+    const top=pageStack[pageStack.length-1];
+    if(top&&top.fn===teacherProfilePageHTML)replacePage(teacherProfilePageHTML);
+    notify("Profile photo updated.");
+  }catch(e){notify("Could not read that image.","error");}
+  input.value="";
+}
+async function pickQrImage(input){
+  const file=input.files&&input.files[0];if(!file)return;
+  try{
+    state.qrCodeDataUrl=await fileToResizedDataURL(file,500);
+    await save();
+    const top=pageStack[pageStack.length-1];
+    if(top&&top.fn===teacherProfilePageHTML)replacePage(teacherProfilePageHTML);
+    notify("QR code saved.");
+  }catch(e){notify("Could not read that image.","error");}
+  input.value="";
+}
+function removeQrImage(){
+  state.qrCodeDataUrl="";save();
+  const top=pageStack[pageStack.length-1];
+  if(top&&top.fn===teacherProfilePageHTML)replacePage(teacherProfilePageHTML);
+}
+function showTeacherProfilePage(){showPage(teacherProfilePageHTML);}
+function socialIconInstagram(){return `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r="1"/></svg>`;}
+function socialIconYoutube(){return `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10.5 9.5v5l4.5-2.5Z" fill="currentColor" stroke="none"/></svg>`;}
+function teacherProfilePageHTML(){
   if(profileEditingOpen){
-    return `<form onsubmit="saveTeacherProfile(event)">
+    return `
+    <div class="page-head"><button type="button" class="btn back-btn" onclick="toggleProfileEdit(false)">‹</button><div><div class="page-title">Edit Profile</div><div class="page-sub">About you &amp; your institute</div></div></div>
+    <form onsubmit="saveTeacherProfile(event)">
       <div class="field"><label>Your Name *</label><input name="teacher" required value="${esc(state.teacher)}"></div>
       <div class="field"><label>Institute / Tuition Name *</label><input name="brand" required maxlength="60" value="${esc(state.brand)}"></div>
       <div class="field"><label>Gender *</label><select name="gender" required><option value="male" ${state.gender==="male"?"selected":""}>Male</option><option value="female" ${state.gender==="female"?"selected":""}>Female</option></select></div>
       <div class="field"><label>Academic Session Start</label><input name="sessionStart" type="month" required value="${esc(state.sessionStart||"")}"></div>
       <div class="field"><label>Academic Session End</label><input name="sessionEnd" type="month" required value="${esc(state.sessionEnd||"")}"></div>
-      <div class="field"><label>WhatsApp Number</label><input name="teacherWhatsapp" type="tel" placeholder="e.g. 9876543210" value="${esc(state.teacherWhatsapp||"")}"></div>
+      <div class="field"><label>Mobile Number</label><input name="teacherWhatsapp" type="tel" placeholder="e.g. 9876543210" value="${esc(state.teacherWhatsapp||"")}"></div>
+      <div class="field"><label>Email</label><input name="teacherEmail" type="email" placeholder="e.g. you@example.com" value="${esc(state.teacherEmail||"")}"></div>
+      <div class="field"><label>Address</label><textarea name="teacherAddress" rows="2" placeholder="Institute address">${esc(state.teacherAddress||"")}</textarea></div>
       <div class="field"><label>Instagram Handle</label><input name="teacherInstagram" placeholder="e.g. @sciencebymukul" value="${esc(state.teacherInstagram||"")}"></div>
       <div class="field"><label>YouTube Channel</label><input name="teacherYoutube" placeholder="e.g. @sciencebymukul" value="${esc(state.teacherYoutube||"")}"></div>
-      <div class="field-help" style="margin:-4px 0 14px">Whatever you fill in here shows up at the bottom of every fee receipt, under your name. Leave any of them blank to leave it off the receipt.</div>
+      <div class="field"><label>UPI ID</label><input name="upiId" placeholder="e.g. name@upi" value="${esc(state.upiId||"")}"></div>
+      <div class="field-help" style="margin:-4px 0 14px">These details show up on fee receipts and reminders, under your name. Leave any field blank to leave it off.</div>
       <div class="form-actions"><button type="button" class="btn btn-light" onclick="toggleProfileEdit(false)">Cancel</button><button type="submit" class="btn btn-primary">Save Profile</button></div>
     </form>`;
   }
   return `
+    <div class="page-head"><button type="button" class="btn back-btn" onclick="goBack()">‹</button><div style="flex:1"><div class="page-title">Profile</div></div>
+      <button type="button" class="btn btn-light btn-small" title="Edit Profile" onclick="toggleProfileEdit(true)" style="margin-left:auto"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9a2.1 2.1 0 0 0-4-4L4 16v4Z"/></svg></button>
+    </div>
+    <section class="tprofile-hero">
+      <div class="tprofile-photo-wrap">
+        <label class="tprofile-photo">
+          ${state.teacherPhotoDataUrl?`<img src="${state.teacherPhotoDataUrl}" alt="">`:esc(initials(state.teacher||state.brand||"T"))}
+          <input type="file" accept="image/*" style="display:none" onchange="pickTeacherPhoto(this)">
+        </label>
+        <span class="tprofile-photo-edit"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9a2.1 2.1 0 0 0-4-4L4 16v4Z"/></svg></span>
+      </div>
+      <h1>${esc(state.teacher||"—")}</h1>
+      <p>${esc(state.brand||"—")}</p>
+      ${(state.teacherInstagram||state.teacherYoutube)?`<div class="tprofile-social-row">
+        ${state.teacherInstagram?`<span class="tprofile-social-link">${socialIconInstagram()}${esc(state.teacherInstagram)}</span>`:""}
+        ${state.teacherYoutube?`<span class="tprofile-social-link">${socialIconYoutube()}${esc(state.teacherYoutube)}</span>`:""}
+      </div>`:""}
+    </section>
     <div class="detail-grid">
-      <div class="detail-item full"><div class="dl">Name</div><div class="dv">${esc(state.teacher||"—")}</div></div>
-      <div class="detail-item full"><div class="dl">Institute / Tuition</div><div class="dv">${esc(state.brand||"—")}</div></div>
+      <div class="detail-item"><div class="dl">Mobile</div><div class="dv">${esc(state.teacherWhatsapp||"—")}</div></div>
+      <div class="detail-item"><div class="dl">Email</div><div class="dv">${esc(state.teacherEmail||"—")}</div></div>
+      <div class="detail-item full"><div class="dl">Address</div><div class="dv">${esc(state.teacherAddress||"—")}</div></div>
       <div class="detail-item"><div class="dl">Session Start</div><div class="dv">${state.sessionStart?monthLabel(state.sessionStart):"—"}</div></div>
       <div class="detail-item"><div class="dl">Session End</div><div class="dv">${state.sessionEnd?monthLabel(state.sessionEnd):"—"}</div></div>
-      <div class="detail-item"><div class="dl">WhatsApp</div><div class="dv">${esc(state.teacherWhatsapp||"—")}</div></div>
-      <div class="detail-item"><div class="dl">Instagram</div><div class="dv">${esc(state.teacherInstagram||"—")}</div></div>
-      <div class="detail-item"><div class="dl">YouTube</div><div class="dv">${esc(state.teacherYoutube||"—")}</div></div>
-    </div>`;
+    </div>
+    <div class="qr-card">
+      <h2 style="margin:0 0 4px;font-size:14.5px;font-weight:500">Payment QR &amp; UPI ID</h2>
+      <div class="field-help">Sent along with fee reminders so parents can pay instantly.</div>
+      <div class="qr-preview">${state.qrCodeDataUrl?`<img src="${state.qrCodeDataUrl}" alt="QR code">`:`<span class="empty-note" style="border:none;background:none">No QR code saved</span>`}</div>
+      <div class="dv" style="margin-bottom:8px">${state.upiId?esc(state.upiId):"No UPI ID saved"}</div>
+      <div class="qr-actions">
+        <label class="btn btn-light btn-small">Upload QR<input type="file" accept="image/*" style="display:none" onchange="pickQrImage(this)"></label>
+        ${state.qrCodeDataUrl?`<button type="button" class="btn btn-light btn-small" onclick="removeQrImage()">Remove QR</button>`:""}
+        <button type="button" class="btn btn-light btn-small" onclick="toggleProfileEdit(true)">Edit UPI ID</button>
+      </div>
+    </div>
+  `;
 }
 async function saveTeacherProfile(e){
   e.preventDefault();
@@ -3983,14 +4391,18 @@ async function saveTeacherProfile(e){
   state.brand=String(f.get("brand")||"").trim();
   state.gender=f.get("gender");
   state.teacherWhatsapp=String(f.get("teacherWhatsapp")||"").trim();
+  state.teacherEmail=String(f.get("teacherEmail")||"").trim();
+  state.teacherAddress=String(f.get("teacherAddress")||"").trim();
   state.teacherInstagram=String(f.get("teacherInstagram")||"").trim();
   state.teacherYoutube=String(f.get("teacherYoutube")||"").trim();
+  state.upiId=String(f.get("upiId")||"").trim();
   state.sessionStart=sessionStart;state.sessionEnd=sessionEnd;
   if(!await save())return;
   haptic();notify("Profile updated.");
   profileEditingOpen=false;
-  const el=document.getElementById("profileSection");
-  if(el)el.innerHTML=profileSectionInnerHTML();
+  syncDrawerBrand();
+  const top=pageStack[pageStack.length-1];
+  if(top&&top.fn===teacherProfilePageHTML)replacePage(teacherProfilePageHTML);
 }
 function makeResetCode(){
   const words=["amber","atlas","cedar","comet","delta","ember","falcon","forest","harbor","indigo","lunar","maple","orbit","pearl","quartz","river","silver","solar","stone","tiger","violet","willow"];
@@ -4118,6 +4530,8 @@ async function exportDataBackup(){
     state.lastBackupAt=new Date().toISOString();
     await save();
     haptic();notify("Backup downloaded.");
+    const top=pageStack[pageStack.length-1];
+    if(top&&top.fn===backupPageHTML)replacePage(backupPageHTML);
   }catch(e){notify("Backup could not be created.","error");}
 }
 function importDataBackup(e){
