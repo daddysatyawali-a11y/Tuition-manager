@@ -1,54 +1,21 @@
-/* Tuition Manager — service worker
-   Bump CACHE_VERSION on every deploy so returning users pick up
-   the new app shell instead of being stuck on a cached old one.
-   All real data lives in IndexedDB, which this never touches. */
-const CACHE_VERSION = "v4";
-const CACHE_NAME = "tuition-manager-" + CACHE_VERSION;
-const APP_SHELL = [
-  "./",
-  "./index.html",
-  "./manifest.json",
-  "./icon-192.png",
-  "./icon-512.png",
-  "./icon-192-maskable.png",
-  "./icon-512-maskable.png",
-  "./apple-touch-icon.png"
-];
+/* Tuition Manager service worker: caches the app shell so it opens offline.
+   Bump VERSION whenever index.html changes so installed copies pick up the update. */
+const VERSION = 'tm-v2';
+const SHELL = ['./', './index.html', './manifest.json', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png'];
 
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(APP_SHELL))
-      .then(() => self.skipWaiting())
-  );
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
 });
-
-self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches.keys()
-      .then((names) => Promise.all(
-        names.filter((n) => n !== CACHE_NAME).map((n) => caches.delete(n))
-      ))
-      .then(() => self.clients.claim())
-  );
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== VERSION).map(k => caches.delete(k)))).then(() => self.clients.claim()));
 });
-
-// Stale-while-revalidate for same-origin app-shell files.
-// Cross-origin requests (the jsPDF CDN scripts) are left to the
-// network as-is — PDF export already tells the user plainly if
-// that fails offline, so the service worker doesn't need to.
-self.addEventListener("fetch", (event) => {
-  const req = event.request;
-  if (req.method !== "GET" || new URL(req.url).origin !== self.location.origin) return;
-
-  event.respondWith(
-    caches.open(CACHE_NAME).then((cache) =>
-      cache.match(req).then((cached) => {
-        const network = fetch(req)
-          .then((res) => { if (res && res.ok) cache.put(req, res.clone()); return res; })
-          .catch(() => cached);
-        return cached || network;
-      })
-    )
-  );
+self.addEventListener('fetch', e => {
+  const req = e.request;
+  if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return; // Google APIs etc. go straight to the network
+  if (req.mode === 'navigate') {
+    e.respondWith(fetch(req).then(r => { const copy = r.clone(); caches.open(VERSION).then(c => c.put('./index.html', copy)); return r; })
+      .catch(() => caches.match('./index.html')));
+    return;
+  }
+  e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(r => { const copy = r.clone(); caches.open(VERSION).then(c => c.put(req, copy)); return r; })));
 });
