@@ -15,7 +15,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <style>
 :root{
-  --h:210;--scale:1;
+  --h:210;
   --font:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
   --bg:#10141C;--s1:#171C26;--s2:#1E2531;--s3:#283041;--line:#2B3446;
   --tx:#E8ECF3;--tx2:#A2ACBF;--tx3:#727D92;
@@ -33,7 +33,7 @@
   color-scheme:light;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html{font-size:calc(16px * var(--scale));-webkit-text-size-adjust:100%}
+html{font-size:16px;-webkit-text-size-adjust:100%}
 body{background:var(--bg);color:var(--tx);font-family:var(--font);line-height:1.45;min-height:100dvh;-webkit-tap-highlight-color:transparent}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer;background:none;border:0;text-align:inherit}
@@ -338,7 +338,6 @@ const DRIVE_FILE = 'tuition-manager-backup.json';
 const STATE_KEY = 'state';
 const FONTS = {
   system:{n:'System',s:'system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif'},
-  humanist:{n:'Humanist',s:'"Trebuchet MS","Gill Sans","Segoe UI",Verdana,sans-serif'},
   cambria:{n:'Cambria',s:'Cambria,"Iowan Old Style",Georgia,serif'},
   consolas:{n:'Consolas',s:'Consolas,"SF Mono",Menlo,"Courier New",monospace'}
 };
@@ -498,7 +497,7 @@ const store={
 
 /* ---------- state ---------- */
 function defState(){return{
-  setupDone:false,loggedOut:false,theme:'dark',accentHue:210,appFont:'system',textScale:100,listView:'list',
+  setupDone:false,loggedOut:false,theme:'dark',accentHue:210,appFont:'system',listView:'list',
   teacher:'',brand:'',gender:'male',teacherWhatsapp:'',teacherInstagram:'',teacherYoutube:'',teacherEmail:'',teacherAddress:'',teacherNote:'',
   qrCodeDataUrl:'',upiId:'',sessionStart:'',sessionEnd:'',
   classes:[],activeClass:'All',retiredClasses:[],classColors:{},classGroupLinks:{},
@@ -514,6 +513,9 @@ function normalizeState(st){
   o.leftStudentTransactions.forEach(a=>{if(!a.transactions)a.transactions=[]});
   o.tests.forEach(t=>{if(!t.marks)t.marks={};if(!t.absent)t.absent={}});
   if(!o.paymentModes.length)o.paymentModes=['Cash','UPI'];
+  if(!FONTS[o.appFont])o.appFont='system';
+  delete o.textScale;
+  o.students.forEach(s=>{if(!Array.isArray(s.plan))s.plan=[]});
   return o;
 }
 let saveT=null;
@@ -582,13 +584,9 @@ function sessionMonthsElapsed(){
   return Math.max(1,monthDiff(start,end)+1);
 }
 function notifData(){
-  const dis=state.notifDismissed||{};
-  const bk='backup:'+(state.lastBackupAt||'never'),tk='teacher';
   const defaulters=defaulterList();
-  const backup=(!state.lastBackupAt||daysSince(state.lastBackupAt)>=7)&&!dis[bk];
-  const incomplete=state.students.filter(s=>isActive(s)&&(!s.contacts.some(c=>String(c).trim())||!s.memberships.some(m=>m.class)));
-  const teacher=!state.teacherWhatsapp&&!state.teacherInstagram&&!state.teacherYoutube&&!dis[tk];
-  return{defaulters,backup,incomplete,teacher,bk,tk,count:defaulters.length+(backup?1:0)+incomplete.length+(teacher?1:0)};
+  const backup=!state.lastBackupAt||daysSince(state.lastBackupAt)>=7;
+  return{defaulters,backup,count:defaulters.length+(backup?1:0)};
 }
 const quoteOfDay=off=>{const d=new Date();const doy=Math.floor((d-new Date(d.getFullYear(),0,0))/864e5);return QUOTES[(doy+off)%QUOTES.length]};
 
@@ -618,22 +616,42 @@ function makeZip(files){
   const end=new Uint8Array([0x50,0x4b,5,6,...u16(0),...u16(0),...u16(files.length),...u16(files.length),...u32(cdSize),...u32(off),...u16(0)]);
   return new Blob([...parts,...central,end],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
 }
-function makeXlsx(sheetName,rows){
-  const col=i=>String.fromCharCode(65+i);
-  const x=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'');
-  const sd=rows.map((r,ri)=>'<row r="'+(ri+1)+'">'+r.map((v,ci)=>{
-    const ref=col(ci)+(ri+1);
-    return typeof v==='number'?'<c r="'+ref+'"><v>'+v+'</v></c>':'<c r="'+ref+'" t="inlineStr"><is><t xml:space="preserve">'+x(v)+'</t></is></c>';
-  }).join('')+'</row>').join('');
+const xlsxCol=i=>{let n=i+1,c='';while(n>0){const m=(n-1)%26;c=String.fromCharCode(65+m)+c;n=Math.floor((n-1)/26)}return c};
+/* sheets: [{name, rows:[[...]], bold:[rowIndexes]}]. Row 0 is the header (bold, frozen). */
+function makeXlsxMulti(sheets){
+  const x=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'');
+  const used=new Set();
+  const names=sheets.map((sh,i)=>{
+    let n=String(sh.name||'Sheet'+(i+1)).replace(/[\[\]:*?\/\\]/g,' ').trim().slice(0,31)||'Sheet'+(i+1),base=n,k=2;
+    while(used.has(n.toLowerCase())){const suf=' '+k++;n=base.slice(0,31-suf.length)+suf}
+    used.add(n.toLowerCase());return n;
+  });
   const H='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
-  return makeZip([
-    {name:'[Content_Types].xml',data:H+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>'},
-    {name:'_rels/.rels',data:H+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'},
-    {name:'xl/workbook.xml',data:H+'<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="'+x(sheetName).slice(0,31)+'" sheetId="1" r:id="rId1"/></sheets></workbook>'},
-    {name:'xl/_rels/workbook.xml.rels',data:H+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>'},
-    {name:'xl/worksheets/sheet1.xml',data:H+'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="1" width="26" customWidth="1"/><col min="2" max="2" width="22" customWidth="1"/><col min="3" max="3" width="14" customWidth="1"/><col min="4" max="4" width="12" customWidth="1"/><col min="5" max="5" width="14" customWidth="1"/><col min="6" max="6" width="30" customWidth="1"/></cols><sheetData>'+sd+'</sheetData></worksheet>'}
-  ]);
+  const NS='http://schemas.openxmlformats.org/spreadsheetml/2006/main',RNS='http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+  const sheetXml=sh=>{
+    const rows=sh.rows,bold=new Set(sh.bold||[]),ncol=rows.reduce((m,r)=>Math.max(m,r.length),1),w=[];
+    for(let c=0;c<ncol;c++){let m=8;rows.forEach(r=>{const v=r[c];if(v!=null&&v!=='')m=Math.max(m,Math.min(String(v).length,44))});w.push(m+2)}
+    const sd=rows.map((r,ri)=>{
+      const st=(ri===0||bold.has(ri))?' s="1"':'';
+      return '<row r="'+(ri+1)+'">'+r.map((v,ci)=>{
+        if(v==null||v==='')return '';
+        const ref=xlsxCol(ci)+(ri+1);
+        return typeof v==='number'&&isFinite(v)?'<c r="'+ref+'"'+st+'><v>'+v+'</v></c>':'<c r="'+ref+'"'+st+' t="inlineStr"><is><t xml:space="preserve">'+x(v)+'</t></is></c>';
+      }).join('')+'</row>';
+    }).join('');
+    return H+'<worksheet xmlns="'+NS+'"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>'+w.map((v,i)=>'<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+v+'" customWidth="1"/>').join('')+'</cols><sheetData>'+sd+'</sheetData></worksheet>';
+  };
+  const files=[
+    {name:'[Content_Types].xml',data:H+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+sheets.map((_,i)=>'<Override PartName="/xl/worksheets/sheet'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join('')+'</Types>'},
+    {name:'_rels/.rels',data:H+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="'+RNS+'/officeDocument" Target="xl/workbook.xml"/></Relationships>'},
+    {name:'xl/workbook.xml',data:H+'<workbook xmlns="'+NS+'" xmlns:r="'+RNS+'"><bookViews><workbookView xWindow="0" yWindow="0" windowWidth="20000" windowHeight="10000"/></bookViews><sheets>'+names.map((n,i)=>'<sheet name="'+x(n)+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>').join('')+'</sheets></workbook>'},
+    {name:'xl/_rels/workbook.xml.rels',data:H+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+sheets.map((_,i)=>'<Relationship Id="rId'+(i+1)+'" Type="'+RNS+'/worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>').join('')+'<Relationship Id="rId'+(sheets.length+1)+'" Type="'+RNS+'/styles" Target="styles.xml"/></Relationships>'},
+    {name:'xl/styles.xml',data:H+'<styleSheet xmlns="'+NS+'"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>'}
+  ];
+  sheets.forEach((sh,i)=>files.push({name:'xl/worksheets/sheet'+(i+1)+'.xml',data:sheetXml(sh)}));
+  return makeZip(files);
 }
+const makeXlsx=(sheetName,rows)=>makeXlsxMulti([{name:sheetName,rows}]);
 function download(blob,name){
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.append(a);a.click();
   setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);
@@ -759,7 +777,7 @@ const cnt=(n,money)=>'<span class="num" data-count="'+(+n||0)+'"'+(money?' data-
 let tab='home',stack=[],tabScroll={},rtok=0;
 const TABS={},PAGES={};
 const TAB_DEF=[['home','home','Home'],['students','users','Students'],['payments','card','Payments'],['tests','file','Tests']];
-const DRAWER_DEF=[['attendance','clip','Attendance'],['classes','layers','Classes'],['reports','bars','Reports'],['backup','cloud','Backup & Restore'],['settings','sliders','Settings'],['about','info','About & Help']];
+const DRAWER_DEF=[['attendance','clip','Attendance'],['classes','layers','Classes'],['reports','bars','Reports'],['export','down','Export to Excel'],['backup','cloud','Backup & Restore'],['settings','sliders','Settings'],['about','info','About & Help']];
 const navKey=()=>stack.length?stack[stack.length-1].nav:tab;
 
 function go(p,a={},opts={}){
@@ -909,6 +927,20 @@ function chartInner(first){
   return '<div class="ch-head"><div><small>'+(mode==='session'?'Session progress':'Fees collected')+'</small><div class="ch-val">'+(first?cnt(val,true):'<span class="num">'+inr(val)+'</span>')+'</div><small style="display:block">'+mLabel(sp.m)+'</small>'+mom+'</div><span class="pill ac">'+tag+'</span></div>'+
     '<svg class="chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Fees collected by month">'+g+'</svg>';
 }
+function feesSummaryHTML(){
+  const by=feesByMonth(),now=curYM(),pm=addMonths(now,-1),cur=by[now]||0,prev=by[pm]||0;
+  let mom;
+  if(prev>0&&cur===prev)mom='<div class="mom flat">'+ic('minus')+'Same as last month</div>';
+  else if(prev>0){const pct=Math.round(Math.abs(cur-prev)/prev*100),up=cur>prev;mom='<div class="mom '+(up?'up':'down')+'">'+ic(up?'up2':'down2')+pct+'% '+(up?'more':'less')+' than last month</div>'}
+  else if(cur>0)mom='<div class="mom up">'+ic('up2')+'Nothing collected last month</div>';
+  else mom='<div class="mom flat">'+ic('minus')+'Nothing collected yet this month</div>';
+  return '<div class="ch-head"><div><small>Fees collected</small><div class="ch-val">'+cnt(cur,true)+'</div><small style="display:block">'+mLabel(now)+'</small>'+mom+'</div><span class="pill ac">Graph'+ic('chevR')+'</span></div>';
+}
+ACT.openChart=()=>go('feesChart',{},{nav:'home'});
+PAGES.feesChart=function(){
+  chartSel=null;
+  return{title:'Fees collected',html:'<div class="wrap"><div class="card chartcard" id="chartCard" style="cursor:default">'+chartInner(true)+'</div><div class="btns" style="margin-top:1rem"><button class="btn" data-a="goPayments">'+ic('card')+'All payments</button></div></div>'};
+};
 ACT.chartPick=el=>{chartSel=+el.dataset.i;$('#chartCard').innerHTML=chartInner(false)};
 ACT.goPayments=()=>setTab('payments');
 
@@ -977,7 +1009,7 @@ TABS.home=function(){
       '<div id="hres"></div>'+
       '<div class="dash qa">'+qa.map(a=>'<button data-a="'+a[0]+'"><span class="qi">'+ic(a[1])+'</span>'+a[2]+'</button>').join('')+'</div>'+
       '<div class="dash quote c4"><p>“'+esc(q[0])+'”</p><small>'+esc(q[1])+'</small></div>'+
-      '<div class="dash card chartcard c8" id="chartCard" data-a="goPayments">'+chartInner(true)+'</div>'+
+      '<button class="dash card chartcard c8" data-a="openChart" style="text-align:left;width:100%;padding-bottom:1.1rem">'+feesSummaryHTML()+'</button>'+
       '<div class="dash glance">'+
         '<button data-a="tileStudents"><span class="gi">'+ic('users')+'</span><b>'+cnt(act)+'</b><small>Active students</small></button>'+
         '<button data-a="tileTests"><span class="gi">'+ic('file')+'</span><b>'+cnt(wk)+'</b><small>Tests this week</small></button>'+
@@ -1076,7 +1108,7 @@ function classOptions(sel,extra){
 }
 const contactRow=(v,first)=>'<div class="inrow"><input class="inp c-in" type="tel" inputmode="tel" placeholder="Mobile number" value="'+esc(v)+'">'+(first?'':'<button class="ib" data-a="rmRow" aria-label="Remove number">'+ic('x')+'</button>')+'</div>';
 const memRow=(m,first,extra)=>'<div class="inrow"><select class="inp m-class" style="flex:1">'+classOptions(m.class,extra)+'</select><input class="inp m-sub" style="flex:1" placeholder="Subject (optional)" value="'+esc(m.subject||'')+'">'+(first?'':'<button class="ib" data-a="rmRow" aria-label="Remove class">'+ic('x')+'</button>')+'</div>';
-ACT.rmRow=el=>el.closest('.inrow').remove();
+ACT.rmRow=el=>{el.closest('.inrow').remove();if(el.dataset.after==='planSum')planSumUpdate()};
 ACT.addContact=()=>$('#contacts').insertAdjacentHTML('beforeend',contactRow('',false));
 ACT.addMem=()=>$('#mems').insertAdjacentHTML('beforeend',memRow({class:state.activeClass!=='All'?state.activeClass:'',subject:''},false));
 INP.feeType=()=>{const t=document.querySelector('input[name=ft]:checked').value;$('#feeTotalWrap').classList.toggle('hidden',t!=='total');$('#feeMonthWrap').classList.toggle('hidden',t!=='monthly')};
@@ -1132,6 +1164,7 @@ PAGES.studentProfile=function({id}){
     '<div class="stats3">'+stats.map(x=>'<div class="stat"><small>'+x[0]+'</small><b class="'+x[2]+'">'+cnt(x[1],true)+'</b></div>').join('')+'</div>'+
     (monthly?'<small style="display:block;margin:.5rem .2rem 0">Expected till now: '+inr(expectedOf(s))+' for '+monthsSince(s)+' month'+(monthsSince(s)>1?'s':'')+'</small>':'')+
     '<div class="btns" style="margin-top:1rem"><button class="btn primary" data-a="stuPay" data-id="'+s.id+'">'+ic('card')+'Record payment</button><button class="btn" data-a="stuRemind" data-id="'+s.id+'">'+ic('chat')+'Send reminder</button></div>'+
+    (monthly?'':planHTML(s))+
     '<div class="sect"><h2>Details</h2></div><div class="list">'+
       '<div class="kv"><span>Admission no.</span><span>'+esc(s.admissionNo||'—')+'</span></div>'+
       '<div class="kv"><span>Father</span><span>'+esc(s.father||'—')+'</span></div>'+
@@ -1140,7 +1173,7 @@ PAGES.studentProfile=function({id}){
       (s.remarks?'<div class="kv"><span>Remarks</span><span>'+esc(s.remarks)+'</span></div>':'')+'</div>'+
     '<div class="sect"><h2>Contact</h2></div>'+(phones.length?'<div class="list">'+phones.map(p=>'<div class="row"><span class="act-ic">'+ic('phone')+'</span><span class="grow"><b class="num">'+esc(p)+'</b></span><a class="ib" href="tel:'+esc(p)+'" aria-label="Call">'+ic('phone')+'</a><a class="ib" href="https://wa.me/'+waNumber(p)+'" target="_blank" rel="noopener" aria-label="WhatsApp">'+ic('chat')+'</a></div>').join('')+'</div>':'<div class="list"><div class="row"><small>No phone number yet. Edit the student to add one.</small></div></div>')+
     '<div class="sect"><h2>Tests and attendance</h2></div><div class="list"><button class="row" data-a="stuTests" data-id="'+s.id+'"><span class="act-ic">'+ic('file')+'</span><span class="grow"><b>Test history</b></span>'+ic('chevR')+'</button><button class="row" data-a="stuAtt" data-id="'+s.id+'"><span class="act-ic">'+ic('clip')+'</span><span class="grow"><b>Attendance</b></span>'+ic('chevR')+'</button></div>'+
-    '<div class="sect"><h2>Payments</h2>'+(tx.length?'<button class="btn sm" data-a="stuShare" data-id="'+s.id+'">'+ic('share')+'Share statement</button>':'')+'</div>'+
+    '<div class="sect"><h2>Payments</h2>'+((tx.length||(!monthly&&planOf(s).length))?'<button class="btn sm" data-a="stuShare" data-id="'+s.id+'">'+ic('share')+'Share with parent</button>':'')+'</div>'+
     (tx.length?'<div class="list">'+tx.map(t=>'<button class="row" data-a="payOpen" data-id="'+t.id+'"><span class="grow"><b class="num">'+inr(t.amount)+'</b><small>'+fmtDate(t.date)+(t.mode?' · '+esc(t.mode):'')+(t.remark?' · '+esc(t.remark):'')+'</small></span>'+ic('edit')+'</button>').join('')+'</div>':'<div class="list"><div class="empty">'+ic('card')+'<span>No payments recorded yet.</span></div></div>')+
     '<div class="btns" style="margin-top:1.4rem">'+(s.leftDate?'<button class="btn" data-a="restoreStu" data-id="'+s.id+'">'+ic('undo')+'Restore student</button>':'<button class="btn" data-a="leftStu" data-id="'+s.id+'">'+ic('logout')+'Mark as left</button>')+'<button class="btn danger" data-a="delStu" data-id="'+s.id+'">'+ic('trash')+'Delete</button></div></div>'};
 };
@@ -1168,6 +1201,91 @@ ACT.delStu=async el=>{
   state.students=state.students.filter(x=>x.id!==s.id);
   state.tests.forEach(t=>{delete t.marks[s.id];delete t.absent[s.id]});
   save();toast('Student deleted');back();
+};
+
+/* --- installment plan (one-time-fee students) ---
+   Everything a student has paid is applied to the installments in date order. A larger payment
+   spills into the next installment; a smaller one leaves the installment marked Partial. */
+const planOf=s=>Array.isArray(s.plan)?s.plan:[];
+const r2=n=>Math.round((+n||0)*100)/100;
+function planStatus(s){
+  let pool=paidOf(s);
+  const rows=planOf(s).slice().sort((a,b)=>String(a.month).localeCompare(String(b.month))).map(p=>{
+    const amt=r2(p.amount),got=r2(Math.min(pool,amt));pool=r2(pool-got);
+    return{p,amt,got,rem:r2(amt-got),st:got>=amt?'paid':got>0?'partial':'pending'};
+  });
+  return{rows,extra:pool,planned:r2(rows.reduce((a,x)=>a+x.amt,0))};
+}
+function planHTML(s){
+  const edit='<button class="btn sm" data-a="planEdit" data-id="'+s.id+'">'+ic('edit')+(planOf(s).length?'Edit plan':'Set up')+'</button>';
+  if(!planOf(s).length)return '<div class="sect"><h2>Installments</h2>'+edit+'</div><div class="list"><div class="row"><small>No installment plan yet. Split '+inr(feeAmt(s))+' into month-wise amounts and track each one.</small></div></div>';
+  const {rows,extra,planned}=planStatus(s),now=curYM(),fee=feeAmt(s);
+  const row=x=>{
+    const late=x.st!=='paid'&&x.p.month<now;
+    const sub=x.st==='paid'?'Collected':x.st==='partial'?'Partial · '+inr(x.got)+' of '+inr(x.amt)+' paid · '+inr(x.rem)+' left':(late?'Overdue':'Pending');
+    const cls=x.st==='paid'?'good':(late||x.st==='partial')?(late?'bad':'warn'):'';
+    return '<div class="row"><span class="grow"><b>'+mLabel(x.p.month)+'</b><small class="'+cls+'">'+sub+'</small></span><span class="end"><b class="num">'+inr(x.amt)+'</b></span>'+
+      (x.st==='paid'?'<span class="act-ic pay">'+ic('check')+'</span>':'<button class="btn sm primary" data-a="planCollect" data-id="'+s.id+'" data-iid="'+x.p.id+'">Collect</button>')+'</div>';
+  };
+  const note=planned!==r2(fee)?'<small class="warn" style="display:block;margin:.5rem .2rem 0">Plan adds up to '+inr(planned)+' but the total fee is '+inr(fee)+'.</small>':'';
+  const ex=extra>0?'<small style="display:block;margin:.5rem .2rem 0">'+inr(extra)+' paid beyond the plan.</small>':'';
+  const acts='<div class="btns" style="margin-top:.7rem"><button class="btn" data-a="planRemind" data-id="'+s.id+'">'+ic('chat')+'Remind installment</button><button class="btn" data-a="planShare" data-id="'+s.id+'">'+ic('share')+'Share monthly breakdown</button></div>';
+  return '<div class="sect"><h2>Installments</h2>'+edit+'</div><div class="list">'+rows.map(row).join('')+'</div>'+acts+note+ex;
+}
+ACT.planEdit=el=>go('planEdit',{id:el.dataset.id});
+ACT.planCollect=el=>go('payForm',{sid:el.dataset.id,iid:el.dataset.iid});
+const planRow=(m,a)=>'<div class="inrow plan-row"><input class="inp pl-m" type="month" value="'+esc(m)+'" style="flex:1.2"><input class="inp pl-a" type="number" inputmode="decimal" min="0" step="any" placeholder="₹ amount" value="'+esc(a)+'" data-i="planSum" style="flex:1"><button class="ib" data-a="rmRow" data-after="planSum" aria-label="Remove month">'+ic('x')+'</button></div>';
+function planSumUpdate(){
+  const el=$('#planSum');if(!el)return;const fee=+el.dataset.fee||0;
+  const t=r2($$('.pl-a').reduce((a,i)=>a+num(i.value),0)),d=r2(fee-t);
+  el.innerHTML='Planned <b class="num">'+inr(t)+'</b> of <b class="num">'+inr(fee)+'</b>'+(d>0?' · <span class="warn">'+inr(d)+' not assigned</span>':d<0?' · <span class="bad">'+inr(-d)+' over the fee</span>':' · <span class="good">matches</span>');
+}
+INP.planSum=planSumUpdate;
+PAGES.planEdit=function({id}){
+  const s=byId(id);if(!s)return{title:'Installments',html:'<div class="wrap"><div class="empty"><b>Student not found</b></div></div>'};
+  const rows=planOf(s).slice().sort((a,b)=>String(a.month).localeCompare(String(b.month)));
+  const start=rows.length?rows:[{month:curYM(),amount:''}];
+  return{title:'Installments',html:'<div class="wrap narrow"><div class="form">'+
+    '<div class="row card" style="padding:.8rem 1rem">'+avatar(s.name,stuColor(s))+'<span class="grow"><b>'+esc(s.name)+'</b><small>Total fee '+inr(feeAmt(s))+' · Paid '+inr(paidOf(s))+'</small></span></div>'+
+    '<p class="muted">Set the amount due each month. Tap Collect on the student’s profile to record it. Payments are applied to the earliest installment first, so extra money carries into the next one and short payments show as Partial.</p>'+
+    '<div id="planRows" class="form" style="gap:.5rem">'+start.map(r=>planRow(r.month,r.amount)).join('')+'</div>'+
+    '<div class="btns"><button class="btn sm" data-a="planAddRow">'+ic('plus')+'Add month</button><button class="btn sm" data-a="planSplit" data-id="'+s.id+'">Split balance equally</button></div>'+
+    '<div id="planSum" data-fee="'+feeAmt(s)+'" style="font-size:.92rem"></div>'+
+    '<div class="savebar"><button class="btn primary big" data-a="planSave" data-id="'+s.id+'">Save plan</button>'+(planOf(s).length?'<button class="btn danger" data-a="planClear" data-id="'+s.id+'">Clear plan</button>':'')+'</div></div></div>',
+    after:planSumUpdate};
+};
+ACT.planAddRow=()=>{
+  const ms=$$('.pl-m').map(i=>i.value).filter(Boolean).sort();
+  $('#planRows').insertAdjacentHTML('beforeend',planRow(ms.length?addMonths(ms[ms.length-1],1):curYM(),''));planSumUpdate();
+};
+ACT.planSplit=async el=>{
+  const s=byId(el.dataset.id);if(!s)return;
+  const bal=r2(Math.max(0,feeAmt(s)-paidOf(s)));
+  if(!(bal>0)){toast('Nothing left to split','err');return}
+  const v=await promptSheet({title:'Split balance equally',body:'Balance '+inr(bal)+' will be divided over this many months, starting this month.',label:'Number of months',type:'number',value:'5',ok:'Split'});
+  const n=Math.floor(num(v));if(v==null)return;
+  if(!(n>=1&&n<=60)){toast('Enter between 1 and 60 months','err');return}
+  const each=Math.floor(bal/n*100)/100,start=curYM();let left=bal,h='';
+  for(let i=0;i<n;i++){const a=i===n-1?r2(left):each;left=r2(left-a);h+=planRow(addMonths(start,i),a)}
+  $('#planRows').innerHTML=h;planSumUpdate();
+};
+ACT.planSave=async el=>{
+  const s=byId(el.dataset.id);if(!s)return;
+  const rows=$$('#planRows .plan-row').map(r=>({m:$('.pl-m',r).value,a:r2(num($('.pl-a',r).value))})).filter(r=>r.m||r.a);
+  if(!rows.length){toast('Add at least one installment','err');return}
+  if(rows.some(r=>!r.m)){toast('Pick a month for every installment','err');return}
+  if(rows.some(r=>!(r.a>0))){toast('Every installment needs an amount above 0','err');return}
+  if(new Set(rows.map(r=>r.m)).size!==rows.length){toast('Each month can have only one installment','err');return}
+  const tot=r2(rows.reduce((a,r)=>a+r.a,0)),fee=r2(feeAmt(s));
+  if(tot!==fee&&!await confirmDlg('Plan does not match the fee','The plan adds up to '+inr(tot)+' but the total fee is '+inr(fee)+'. Save anyway?','Save anyway',false))return;
+  const old=planOf(s);
+  s.plan=rows.sort((a,b)=>a.m.localeCompare(b.m)).map(r=>{const o=old.find(x=>x.month===r.m);return{id:o?o.id:uid(),month:r.m,amount:r.a}});
+  save();toast('Installment plan saved');back();
+};
+ACT.planClear=async el=>{
+  const s=byId(el.dataset.id);if(!s)return;
+  if(!await confirmDlg('Clear installment plan?','Payments already recorded stay as they are.','Clear plan'))return;
+  s.plan=[];save();toast('Plan cleared');back();
 };
 
 /* --- batch add / edit --- */
@@ -1241,23 +1359,90 @@ TABS.payments=function(){
 };
 ACT.payEdit=el=>go('payForm',{tid:el.dataset.id});
 
-/* --- export to Excel --- */
-ACT.exportXlsx=()=>{
-  const ms=allTx().map(x=>String(x.t.date)).sort();
+/* --- export to Excel: choose what goes in the workbook --- */
+const EXPORT_OPTS=[
+  ['students','Student details','Name, class, contacts, parents, fee type, status'],
+  ['payments','Payments and transactions','Every payment with date, mode and remark'],
+  ['fees','Fee details','Fee, paid and balance for each student, plus installment plans'],
+  ['attendance','Attendance','Month-wise present and absent summary per student'],
+  ['tests','Test history','Marks of every student, plus a summary for each test']
+];
+ACT.exportXlsx=()=>go('export');
+PAGES.export=function(){
+  const ms=allTx().map(x=>String(x.t.date)).concat(state.tests.map(t=>t.date||'')).filter(Boolean).sort();
   const from0=ms[0]||today();
-  openSheet('<h3>Export payments to Excel</h3><p>Choose the date range to include.</p><div class="two stack"><label class="f">From<input class="inp" type="date" id="x_from" value="'+from0+'"></label><label class="f">To<input class="inp" type="date" id="x_to" value="'+today()+'"></label></div><div class="row-end"><button class="btn ghost" data-a="ovClose">Cancel</button><button class="btn primary" data-a="doExport">'+ic('down')+'Export</button></div>');
+  return{title:'Export to Excel',html:'<div class="wrap narrow"><div class="form">'+
+    '<p class="muted">Choose what to include. Each choice becomes its own sheet in one Excel file.</p>'+
+    '<div class="list">'+EXPORT_OPTS.map(o=>'<label class="row" style="cursor:pointer"><input type="checkbox" class="exp-cb" value="'+o[0]+'" data-ch="expPick" checked style="width:1.25rem;height:1.25rem;accent-color:var(--ac);flex:none"><span class="grow" style="white-space:normal"><b>'+o[1]+'</b><small style="white-space:normal">'+o[2]+'</small></span></label>').join('')+'</div>'+
+    '<button class="btn sm" style="align-self:flex-start" data-a="expAll" id="expAllBtn">Clear all</button>'+
+    '<div class="fgroup"><h4>Date range</h4><div class="two stack"><label class="f">From<input class="inp" type="date" id="x_from" value="'+from0+'"></label><label class="f">To<input class="inp" type="date" id="x_to" value="'+today()+'"></label></div><small>Applies to payments, attendance (by month) and tests. Student and fee details are always a full snapshot.</small></div>'+
+    '<div class="savebar"><button class="btn primary big" data-a="expRun" id="expRun">'+ic('down')+'Export</button></div></div></div>'};
 };
-ACT.doExport=()=>{
-  const f=$('#x_from').value,t=$('#x_to').value;
+function expSync(){
+  const n=$$('.exp-cb:checked').length,tot=$$('.exp-cb').length,b=$('#expAllBtn'),r=$('#expRun');
+  if(b)b.textContent=n===tot?'Clear all':'Select all';
+  if(r)r.disabled=!n;
+}
+INP.expPick=expSync;
+ACT.expAll=()=>{const all=$$('.exp-cb:checked').length===$$('.exp-cb').length;$$('.exp-cb').forEach(c=>c.checked=!all);expSync()};
+async function buildExportSheets(sel,from,to){
+  const sheets=[],inR=d=>{d=String(d);return d>=from&&d<=to},fl=x=>x.feeType==='monthly'?'Monthly':'One-time total';
+  const stus=state.students.slice().sort(byName),now=curYM();
+  if(sel.has('students')){
+    const rows=[['Name','Admission no.','Class and subject','Father','Mother','Phone numbers','Fee type','Fee (₹)','Date added','Status','Left on','Remarks']];
+    stus.forEach(x=>rows.push([x.name,x.admissionNo||'',clsLabel(x),x.father||'',x.mother||'',x.contacts.filter(c=>String(c).trim()).join(', '),fl(x),feeAmt(x),x.addedDate||'',x.leftDate?'Left':'Active',x.leftDate||'',x.remarks||'']));
+    sheets.push({name:'Student details',rows});
+  }
+  if(sel.has('payments')){
+    const l=allTx().filter(x=>inR(x.t.date)).sort((a,b)=>String(a.t.date).localeCompare(String(b.t.date)));
+    const rows=[['Date','Student','Class','Amount (₹)','Mode','Remark']];let sum=0;
+    l.forEach(x=>{sum+=+x.t.amount||0;rows.push([String(x.t.date),nm(x.owner)+(x.left?' (Left)':''),x.label,+x.t.amount||0,x.t.mode||'',x.t.remark||''])});
+    rows.push(['Total','','',Math.round(sum*100)/100,'','']);
+    sheets.push({name:'Payments',rows,bold:[rows.length-1]});
+  }
+  if(sel.has('fees')){
+    const rows=[['Student','Class','Fee type','Fee (₹)','Expected till now (₹)','Paid (₹)','Balance (₹)','Status']];
+    stus.forEach(x=>rows.push([x.name,clsLabel(x),fl(x),feeAmt(x),expectedOf(x),paidOf(x),balOf(x),(feeAmt(x)<=0?'No fee set':balOf(x)>0?'Due':'Paid up')+(x.leftDate?' (Left)':'')]));
+    sheets.push({name:'Fee details',rows});
+    const ins=[['Student','Class','Month','Amount due (₹)','Collected (₹)','Remaining (₹)','Status']];
+    stus.forEach(x=>{if(x.feeType==='monthly')return;planStatus(x).rows.forEach(r=>ins.push([x.name,clsLabel(x),mLabel(r.p.month),r.amt,r.got,r.rem,r.st==='paid'?'Collected':r.st==='partial'?'Partial':(r.p.month<now?'Overdue':'Pending')]))});
+    if(ins.length>1)sheets.push({name:'Installments',rows:ins});
+  }
+  if(sel.has('attendance')){
+    const rows=[['Student','Class','Month','Working days','Present','Absent','Attendance %','Absent on (dates)']],m0=from.slice(0,7),m1=to.slice(0,7);
+    for(const k of (await store.keys('att:')).sort()){
+      const m=k.slice(4,11),c=k.slice(12);if(m<m0||m>m1)continue;
+      const rec=await store.getJ(k);if(!rec||typeof rec!=='object')continue;
+      if(!Array.isArray(rec.holidays))rec.holidays=[];if(!rec.records)rec.records={};
+      state.students.filter(x=>memOf(x,c)&&(x.addedDate||'').slice(0,7)<=m&&(!x.leftDate||x.leftDate.slice(0,7)>=m)).sort(byName).forEach(x=>{
+        const st=attStats(rec,m,x);if(!st.total)return;
+        rows.push([x.name+(x.leftDate?' (Left)':''),c,mLabel(m),st.total,st.present,st.absent.length,st.pct==null?'':st.pct,st.absent.map(d=>+d.slice(8)).join(', ')]);
+      });
+    }
+    sheets.push({name:'Attendance',rows});
+  }
+  if(sel.has('tests')){
+    const ts=state.tests.filter(t=>inR(t.date)).sort((a,b)=>String(a.date).localeCompare(String(b.date))||coll.compare(a.name,b.name));
+    const rows=[['Date','Test','Class','Subject','Max marks','Student','Marks','Percent','Status']],sum=[['Date','Test','Class','Subject','Max marks','Appeared','Absent','Average marks','Average %']];
+    ts.forEach(t=>{
+      const l=testRoster(t);
+      l.forEach(x=>{const m=t.marks[x.id],has=typeof m==='number';rows.push([t.date,t.name,t.class,t.subject||'',t.maxMarks,x.name+(x.leftDate?' (Left)':''),has?m:'',has&&t.maxMarks>0?Math.round(m/t.maxMarks*1000)/10:'',has?'Appeared':'Absent'])});
+      const st=testStats(t);
+      sum.push([t.date,t.name,t.class,t.subject||'',t.maxMarks,st?st.n:0,l.length-(st?st.n:0),st?Math.round(st.avg*100)/100:'',st?Math.round(st.pct*10)/10:'']);
+    });
+    sheets.push({name:'Test history',rows});sheets.push({name:'Test summary',rows:sum});
+  }
+  return sheets;
+}
+ACT.expRun=async()=>{
+  const sel=new Set($$('.exp-cb:checked').map(c=>c.value)),f=$('#x_from').value,t=$('#x_to').value;
+  if(!sel.size){toast('Choose at least one thing to export','err');return}
   if(!f||!t||f>t){toast('Choose a valid date range','err');return}
-  const l=allTx().filter(x=>String(x.t.date)>=f&&String(x.t.date)<=t).sort((a,b)=>String(a.t.date).localeCompare(String(b.t.date)));
-  if(!l.length){toast('No payments in that range','err');return}
-  const rows=[['Student','Class','Date','Amount (₹)','Mode','Remark']];
-  let sum=0;
-  l.forEach(x=>{sum+=+x.t.amount||0;rows.push([nm(x.owner)+(x.left?' (Left)':''),x.label,String(x.t.date),+x.t.amount||0,x.t.mode||'',x.t.remark||''])});
-  rows.push(['Total','','',sum,'','']);
-  download(makeXlsx('Payments',rows),'payments_'+f+'_to_'+t+'.xlsx');
-  closeOverlay();toast('Exported '+l.length+' payment'+(l.length>1?'s':''));
+  try{
+    const sheets=await buildExportSheets(sel,f,t);
+    download(makeXlsxMulti(sheets),'tuition-data-'+today()+'.xlsx');
+    toast('Exported '+sheets.length+' sheet'+(sheets.length>1?'s':''));
+  }catch(e){console.error(e);toast('Could not create the Excel file','err')}
 };
 
 /* --- pick a student, then record --- */
@@ -1275,19 +1460,21 @@ PAGES.payPick=function(){
 ACT.pickStu=el=>replace('payForm',{sid:el.dataset.id});
 
 /* --- record / edit --- */
-PAGES.payForm=function({sid,tid}){
+PAGES.payForm=function({sid,tid,iid}){
   let owner,t=null;
   if(tid){const x=findTx(tid);if(!x)return{title:'Payment',html:'<div class="wrap"><div class="empty"><b>Payment not found</b></div></div>'};owner=x.owner;t=x.t}
   else owner=byId(sid);
   if(!owner)return{title:'Payment',html:'<div class="wrap"><div class="empty"><b>Student not found</b></div></div>'};
   const isStu=!!owner.memberships;
+  let pre=null;
+  if(!t&&iid&&isStu){const r=planStatus(owner).rows.find(x=>x.p.id===iid);if(r&&r.rem>0)pre={amt:fmtN(r.rem),rem:'Installment · '+mLabel(r.p.month)}}
   const modes=state.paymentModes.slice();if(t&&t.mode&&!modes.includes(t.mode))modes.push(t.mode);
   return{title:t?'Edit payment':'Record payment',html:'<div class="wrap narrow"><div class="form">'+
     '<div class="row card" style="padding:.8rem 1rem">'+avatar(nm(owner),isStu?stuColor(owner):'')+'<span class="grow"><b>'+esc(nm(owner))+'</b><small>'+esc(isStu?clsLabel(owner):(owner.classLabel||''))+'</small></span>'+(isStu?'<span class="end"><small>Balance</small><b class="bal num '+(balOf(owner)?'':'zero')+'">'+inr(balOf(owner))+'</b></span>':'<span class="pill warn">Left</span>')+'</div>'+
-    '<label class="f">Amount (₹) *<input class="inp" id="p_amt" type="number" inputmode="decimal" min="0" step="any" value="'+(t?esc(t.amount):'')+'" placeholder="0"></label>'+
+    '<label class="f">Amount (₹) *<input class="inp" id="p_amt" type="number" inputmode="decimal" min="0" step="any" value="'+(t?esc(t.amount):(pre?esc(pre.amt):''))+'" placeholder="0"></label>'+
     '<div class="two stack"><label class="f">Date *<input class="inp" id="p_date" type="date" value="'+esc(t?t.date:today())+'"></label>'+
     '<label class="f">Payment mode<select class="inp" id="p_mode">'+modes.map(m=>'<option '+((t?t.mode:modes[0])===m?'selected':'')+'>'+esc(m)+'</option>').join('')+'</select></label></div>'+
-    '<label class="f">Remark<input class="inp" id="p_rem" value="'+esc(t?t.remark:'')+'" placeholder="Optional, for example “March fee”"></label>'+
+    '<label class="f">Remark<input class="inp" id="p_rem" value="'+esc(t?t.remark:(pre?pre.rem:''))+'" placeholder="Optional, for example “March fee”"></label>'+
     '<div class="savebar"><button class="btn primary big" data-a="savePay" data-sid="'+esc(sid||'')+'" data-tid="'+esc(tid||'')+'">'+(t?'Save changes':'Save payment')+'</button></div></div></div>',
     after(){if(!t)setTimeout(()=>{const a=$('#p_amt');a&&a.focus()},80)}};
 };
@@ -1353,7 +1540,7 @@ function receiptCanvas(o){
       x.save();rr(M,M,W-2*M,H-2*M,30);x.clip();x.fillStyle='#10141C';x.fillRect(M,M,W-2*M,170);x.fillStyle=acc;x.fillRect(M,M+170,W-2*M,6);x.restore();
     }
     T(state.brand||'Tuition',L,M+82,F(800,46),'#FFFFFF');
-    T(o.kind==='single'?'Payment receipt':'Fee statement',L,M+128,F(500,26),'hsl('+state.accentHue+' 88% 74%)');
+    T(o.kind==='single'?'Payment receipt':o.kind==='plan'?'Monthly fee breakdown':'Fee statement',L,M+128,F(500,26),'hsl('+state.accentHue+' 88% 74%)');
     y=M+176+56;
     T(o.name,L,y,F(700,38),ink);y+=40;
     T((o.adm?'Adm. No. '+o.adm+'   ':'')+o.cls,L,y,F(400,25),mut);
@@ -1371,6 +1558,19 @@ function receiptCanvas(o){
       T('Amount received',L+34,y+52,F(500,26),mut);
       T(inr(r.amount),L+34,y+118,F(800,64),acc);
       y+=150+40;
+    }else if(o.kind==='plan'){
+      const cD=L+500,cP=L+660;let sum=0;
+      T('Month',L,y,F(600,22),mut);T('Due',cD,y,F(600,22),mut,'right');T('Paid',cP,y,F(600,22),mut,'right');T('Status',R,y,F(600,22),mut,'right');y+=18;HR(y);y+=44;
+      o.plan.forEach(r=>{
+        sum+=r.amt;
+        T(mLabel(r.month),L,y,F(500,25),ink);
+        T(inr(r.amt),cD,y,F(700,25),ink,'right');
+        T(r.got>0?inr(r.got):'—',cP,y,F(500,25),mut,'right');
+        T(r.st,R,y,F(700,24),r.st==='Paid'?'#12805F':r.st==='Overdue'?'#C62828':r.st==='Partial'?'#B7791F':mut,'right');
+        y+=50;
+      });
+      HR(y-14);y+=34;
+      T('Total planned',L,y,F(700,28),ink);T(inr(sum),R,y,F(800,32),acc,'right');y+=52;
     }else{
       T('Date',L,y,F(600,22),mut);T('Mode / remark',L+190,y,F(600,22),mut);T('Amount',R,y,F(600,22),mut,'right');y+=18;HR(y);y+=44;
       let sum=0;
@@ -1409,33 +1609,57 @@ ACT.shareReceipt=async el=>{
   const b=await canvasBlob(cv);
   await shareBlob(b,'receipt-'+nm(x.owner).replace(/\s+/g,'-')+'-'+x.t.date+'.png',state.brand+' payment receipt');
 };
-ACT.stuShare=async el=>{
-  const s=byId(el.dataset.id);if(!s||!s.transactions.length)return;
+async function shareTransactions(s){
   const rows=s.transactions.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)));
   const cv=receiptCanvas({kind:'history',name:s.name,adm:s.admissionNo,cls:clsLabel(s),rows,fee:{label:s.feeType==='monthly'?'Fee till now':'Total fee',total:expectedOf(s),paid:paidOf(s),bal:balOf(s)}});
   await shareBlob(await canvasBlob(cv),'statement-'+s.name.replace(/\s+/g,'-')+'.png',state.brand+' fee statement');
+}
+async function shareBreakdown(s){
+  const {rows}=planStatus(s),now=curYM();
+  if(!rows.length){toast('Set up an installment plan first','err');return}
+  const plan=rows.map(r=>({month:r.p.month,amt:r.amt,got:r.got,st:r.st==='paid'?'Paid':r.st==='partial'?'Partial':(r.p.month<now?'Overdue':'Pending')}));
+  const cv=receiptCanvas({kind:'plan',name:s.name,adm:s.admissionNo,cls:clsLabel(s),plan,fee:{label:'Total fee',total:feeAmt(s),paid:paidOf(s),bal:balOf(s)}});
+  await shareBlob(await canvasBlob(cv),'monthly-breakdown-'+s.name.replace(/\s+/g,'-')+'.png',state.brand+' monthly fee breakdown');
+}
+ACT.planShare=el=>{const s=byId(el.dataset.id);if(s)shareBreakdown(s)};
+ACT.stuShare=async el=>{
+  const s=byId(el.dataset.id);if(!s)return;
+  const hasTx=s.transactions.length>0,hasPlan=s.feeType!=='monthly'&&planOf(s).length>0;
+  if(!hasTx&&!hasPlan){toast('Nothing to share yet','err');return}
+  let c=hasTx&&!hasPlan?'tx':!hasTx&&hasPlan?'plan':null;
+  if(!c){
+    c=await chooseSheet('Share with parent',[
+      {v:'tx',label:'All transactions',sub:'Every payment received, with date and mode',icon:'card'},
+      {v:'plan',label:'Monthly breakdown of the fees',sub:'Each month’s installment, what is paid and what is left',icon:'cal'}],
+      'Choose what to send as an image.');
+    if(!c)return;
+  }
+  if(c==='plan')await shareBreakdown(s);else await shareTransactions(s);
 };
 
 /* =====================================================================
    FEE REMINDERS (WhatsApp)
    ===================================================================== */
+/* QR choice for WhatsApp messages → data URL, null (no QR) or undefined (cancelled) */
+async function pickQR(){
+  if(!(state.qrCodeDataUrl||state.upiId))return null;
+  const opts=[];
+  if(state.qrCodeDataUrl)opts.push({v:'saved',label:'Include my saved QR code',icon:'check'});
+  opts.push({v:'upload',label:'Upload a QR for this message only',icon:'up'});
+  opts.push({v:'none',label:'Text only, no QR',icon:'chat'});
+  const c=await chooseSheet('Include a payment QR?',opts);
+  if(!c)return undefined;
+  if(c==='saved')return state.qrCodeDataUrl;
+  if(c==='upload'){const q=await pickImage();return q||undefined}
+  return null;
+}
 async function remindFlow(sid){
   const s=byId(sid);if(!s)return;
   const dflt=balOf(s)||feeAmt(s);
   const v=await promptSheet({title:'Send fee reminder',body:'Message goes to the parent of '+s.name+'.',label:'Amount to request (₹)',type:'number',value:dflt?String(dflt):'',ok:'Continue'});
   if(v===null)return;
   const amt=num(v);if(!(amt>0)){toast('Enter an amount greater than 0','err');return}
-  let qr=null;
-  if(state.qrCodeDataUrl||state.upiId){
-    const opts=[];
-    if(state.qrCodeDataUrl)opts.push({v:'saved',label:'Include my saved QR code',icon:'check'});
-    opts.push({v:'upload',label:'Upload a QR for this message only',icon:'up'});
-    opts.push({v:'none',label:'Text only, no QR',icon:'chat'});
-    const c=await chooseSheet('Include a payment QR?',opts);
-    if(!c)return;
-    if(c==='saved')qr=state.qrCodeDataUrl;
-    else if(c==='upload'){qr=await pickImage();if(!qr)return}
-  }
+  const qr=await pickQR();if(qr===undefined)return;
   let msg='Dear Parent, fee update for '+s.name+' ('+clsLabel(s)+'):\n'+(s.feeType==='monthly'?'Monthly fee':'Total fee')+': '+inr(feeAmt(s))+'\nPaid till date: '+inr(paidOf(s))+'\nAmount requested ('+MONTHS[new Date().getMonth()]+'): '+inr(amt)+'\nKindly pay at the earliest convenience.';
   if(state.upiId)msg+='\nUPI ID: '+state.upiId;
   if(qr)msg+='\n(QR code attached)';
@@ -1458,6 +1682,20 @@ async function deliverWA(s,text,qr){
   if(navigator.share){try{await navigator.share({text})}catch(e){}return}
   await copyText(text);toast('No phone number on file. Message copied, paste it in any app.');
 }
+ACT.planRemind=async el=>{
+  const s=byId(el.dataset.id);if(!s)return;
+  const {rows}=planStatus(s),now=curYM(),open=rows.filter(r=>r.st!=='paid');
+  if(!open.length){toast('All installments are collected');return}
+  const due=open.filter(r=>r.p.month<=now),list=due.length?due:[open[0]];
+  const qr=await pickQR();if(qr===undefined)return;
+  const line=r=>'• '+mLabel(r.p.month)+': '+inr(r.rem)+(r.st==='partial'?' (paid '+inr(r.got)+' of '+inr(r.amt)+')':'');
+  let msg='Dear Parent, installment reminder for '+s.name+' ('+clsLabel(s)+'):\n'+(due.length?'Due now:':'Next installment:')+'\n'+list.map(line).join('\n')+'\n'+
+    (list.length>1?'Total due: '+inr(r2(list.reduce((a,r)=>a+r.rem,0)))+'\n':'')+'Paid till date: '+inr(paidOf(s))+' of '+inr(feeAmt(s))+'\nKindly pay at the earliest convenience.';
+  if(state.upiId)msg+='\nUPI ID: '+state.upiId;
+  if(qr)msg+='\n(QR code attached)';
+  msg+='\n\n'+[state.teacher,state.brand].filter(Boolean).join(', ');
+  await deliverWA(s,msg,qr);
+};
 ACT.stuRemind=el=>remindFlow(el.dataset.id);
 ACT.remind=el=>remindFlow(el.dataset.id);
 /* =====================================================================
@@ -1844,7 +2082,6 @@ PAGES.settings=function(){
     '<div class="sect"><h2>Theme</h2></div><div class="seg">'+[['dark','Dark'],['light','Light'],['system','System']].map(t=>'<label><input type="radio" name="th" value="'+t[0]+'" data-ch="theme" '+(state.theme===t[0]?'checked':'')+'><span>'+t[1]+'</span></label>').join('')+'</div>'+
     '<div class="sect"><h2>Accent colour</h2></div><div class="swatches">'+HUES.map(h=>'<button class="sw '+(state.accentHue===h.h?'on':'')+'" style="--c:hsl('+h.h+' 75% 55%)" data-a="setHue" data-h="'+h.h+'" aria-label="'+h.n+'">'+(state.accentHue===h.h?ic('check'):'')+'</button>').join('')+'</div>'+
     '<div class="sect"><h2>Font</h2></div><div class="chips" style="flex-wrap:wrap">'+Object.keys(FONTS).map(k=>'<button class="chip '+(state.appFont===k?'on':'')+'" style="font-family:'+FONTS[k].s.replace(/"/g,"'")+'" data-a="setFont" data-f="'+k+'">'+FONTS[k].n+'</button>').join('')+'</div>'+
-    '<div class="sect"><h2>Text size</h2><small id="scaleLbl">'+(state.textScale||100)+'%</small></div><input class="rng" type="range" min="100" max="150" step="5" value="'+(state.textScale||100)+'" data-i="scale" aria-label="Text size">'+
     '<div class="sect"><h2>Payment modes</h2></div><div class="chipbox">'+state.paymentModes.map(m=>'<span class="chipx">'+esc(m)+'<button data-a="delMode" data-m="'+esc(m)+'" aria-label="Remove '+esc(m)+'">'+ic('x')+'</button></span>').join('')+'<button class="chip" data-a="addMode">'+ic('plus')+'Add mode</button></div>'+
     '<div class="sect"><h2>More</h2></div><div class="list"><button class="row" data-a="drawerGo" data-p="about"><span class="act-ic">'+ic('info')+'</span><span class="grow"><b>About and help</b></span>'+ic('chevR')+'</button><button class="row" data-a="logout"><span class="act-ic">'+ic('logout')+'</span><span class="grow"><b>Log out</b><small>Locks the app on this device</small></span></button></div>'+
     '<div class="sect"><h2 class="bal">Danger zone</h2></div><div class="card" style="border-color:color-mix(in srgb,var(--bad) 40%,var(--line))"><p class="muted" style="margin-bottom:.8rem">Erase every student, payment, test, attendance record and setting on this device.</p><button class="btn danger" data-a="resetAll">'+ic('trash')+'Master reset</button></div></div>'};
@@ -1852,7 +2089,6 @@ PAGES.settings=function(){
 INP.theme=el=>{state.theme=el.value;save();applyTheme()};
 ACT.setHue=el=>{state.accentHue=+el.dataset.h;save();applyTheme();render(true)};
 ACT.setFont=el=>{state.appFont=el.dataset.f;save();applyTheme();render(true)};
-INP.scale=el=>{state.textScale=+el.value;applyTheme();save();const l=$('#scaleLbl');if(l)l.textContent=el.value+'%'};
 ACT.addMode=async()=>{
   const v=await promptSheet({title:'Add payment mode',label:'Mode name',placeholder:'For example, Cheque',ok:'Add mode'});
   if(v===null)return;if(!v){toast('Enter a mode name','err');return}
@@ -1981,30 +2217,27 @@ PAGES.about=function(){
   return{title:'About & Help',html:'<div class="wrap narrow help">'+
   '<h3>Your data stays on this device</h3><p>Tuition Manager has no account and no server. Students, fees, tests and attendance are stored in this browser only. Nobody else can see them, and nothing is uploaded unless you share it yourself.</p><p>The flip side: uninstalling the app or clearing browser data erases everything. Back up regularly.</p>'+
   '<h3>Students</h3><p>Add students with their classes, contacts and fee type (one-time total or monthly). Mark a student as left to keep their history, or delete them. Batch tools add or edit many at once.</p>'+
-  '<h3>Payments</h3><p>Record a payment from a student’s profile or the Payments tab. Share a receipt as an image, send a fee reminder on WhatsApp, or export a date range to Excel.</p>'+
+  '<h3>Payments</h3><p>Record a payment from a student’s profile or the Payments tab. Share a receipt as an image, share a student’s fees with a parent as all transactions or a monthly breakdown, send a fee reminder on WhatsApp, or export your data to Excel.</p>'+
   '<h3>Tests</h3><p>Create a test and enter every student’s marks on one screen. Leave a mark blank for an absent student. A recorded 0 still counts in the average.</p>'+
   '<h3>Attendance</h3><p>Everyone is present by default. Tap Mark absent for those who missed the day, or use Tuition off for a holiday. The monthly summary shows each student’s percentage.</p>'+
   '<h3>Classes and reports</h3><p>Rename a class and everything follows. Retire a class when it ends; its history stays available. Reports show subject performance, fee collection and attendance.</p>'+
+  '<h3>Export to Excel</h3><p>Open the menu and choose Export to Excel (the download button on the Payments tab opens the same screen). Tick what you want: student details, payments, fee details, attendance and test history. Everything goes into one workbook with a sheet for each choice. The date range limits payments, attendance and tests.</p>'+
   '<h3>How do I back up my data?</h3><ol><li>Open the menu and choose Backup &amp; Restore.</li><li>Tap Backup data.</li><li>Keep the downloaded file somewhere safe, such as your email or cloud drive.</li></ol>'+
   '<h3>How do I restore?</h3><ol><li>Open Backup &amp; Restore and tap Restore backup.</li><li>Pick your backup file and confirm. Restoring replaces everything on this device.</li></ol>'+
   '<h3>How do I connect Google Drive?</h3><ol><li>The app must be hosted over https with a Google client ID set in its code.</li><li>Open Backup &amp; Restore and tap Connect Google Drive.</li><li>Allow access. Then use Back up to Drive and Restore from Drive.</li></ol>'+
-  '<h3>Install the app</h3><p>Use your browser’s Install or Add to Home Screen option. When the browser supports it, Install App also appears in the menu.</p></div>'};
+  '<h3>Install the app</h3><p>Use your browser’s Install or Add to Home Screen option. When the browser supports it, Install App also appears in the menu.</p>'+
+  '<div class="card" style="margin-top:1.4rem;text-align:center"><small>About the app</small><p style="margin-top:.3rem">Tuition Manager is made by<br><b>Mukul Sharma</b><br>Department of Physics</p></div></div>'};
 };
 
 /* =====================================================================
    NOTIFICATIONS
    ===================================================================== */
 PAGES.notifications=function(){
-  const n=notifData();let h='';
-  if(n.defaulters.length)h+='<div class="sect"><h2>Fees due this month</h2><span class="pill bad">'+n.defaulters.length+'</span></div><div class="list">'+n.defaulters.map(s=>'<div class="row"><button class="rowmain" data-a="stu" data-id="'+s.id+'">'+avatar(s.name,stuColor(s))+'<span class="grow"><b>'+esc(s.name)+'</b><small>'+esc(clsLabel(s))+'</small></span><span class="end"><b class="bal num">'+inr(balOf(s))+'</b></span></button><button class="btn sm" data-a="remind" data-id="'+s.id+'">Remind</button></div>').join('')+'</div>';
-  if(n.backup||n.teacher||n.incomplete.length){
-    h+='<div class="sect"><h2>To do</h2></div><div class="list">';
-    if(n.backup)h+='<div class="notif"><span class="act-ic">'+ic('cloud')+'</span><span class="grow" style="white-space:normal"><b style="white-space:normal">'+(state.lastBackupAt?'Last backup was '+ago(state.lastBackupAt):'You haven’t backed up yet')+'</b><small style="white-space:normal">Your data lives only on this device.</small></span><span class="btns" style="flex:none;flex-wrap:nowrap"><button class="btn sm primary" style="min-width:0" data-a="drawerGo" data-p="backup">Back up</button><button class="ib" data-a="dismissNotif" data-k="'+esc(n.bk)+'" aria-label="Dismiss">'+ic('x')+'</button></span></div>';
-    if(n.teacher)h+='<div class="notif"><span class="act-ic">'+ic('user')+'</span><span class="grow" style="white-space:normal"><b style="white-space:normal">Finish your profile</b><small style="white-space:normal">Add WhatsApp, Instagram or YouTube so receipts carry your contact details.</small></span><span class="btns" style="flex:none;flex-wrap:nowrap"><button class="btn sm primary" style="min-width:0" data-a="editTeacher">Edit</button><button class="ib" data-a="dismissNotif" data-k="'+n.tk+'" aria-label="Dismiss">'+ic('x')+'</button></span></div>';
-    n.incomplete.forEach(s=>{const miss=[!s.contacts.some(c=>String(c).trim())&&'phone number',!s.memberships.some(m=>m.class)&&'class'].filter(Boolean).join(' and ');h+='<button class="notif" data-a="editStu" data-id="'+s.id+'"><span class="act-ic">'+ic('user')+'</span><span class="grow" style="white-space:normal;text-align:left"><b style="white-space:normal">'+esc(s.name)+'’s profile is incomplete</b><small style="white-space:normal">Missing '+miss+'</small></span>'+ic('chevR')+'</button>'});
-    h+='</div>';
-  }
-  if(!h)h='<div class="empty">'+ic('check')+'<b>You’re all caught up</b><small>Fee reminders, backups and profile gaps show up here.</small></div>';
+  const n=notifData(),last=state.lastBackupAt;let h='';
+  h+=n.defaulters.length?
+    '<div class="sect"><h2>Pending fees</h2><span class="pill bad">'+n.defaulters.length+'</span></div><div class="list">'+n.defaulters.map(s=>'<div class="row"><button class="rowmain" data-a="stu" data-id="'+s.id+'">'+avatar(s.name,stuColor(s))+'<span class="grow"><b>'+esc(s.name)+'</b><small>'+esc(clsLabel(s))+'</small></span><span class="end"><b class="bal num">'+inr(balOf(s))+'</b></span></button><button class="btn sm" data-a="remind" data-id="'+s.id+'">Remind</button></div>').join('')+'</div>':
+    '<div class="sect"><h2>Pending fees</h2></div><div class="list"><div class="empty">'+ic('check')+'<b>No pending fees</b><small>Everyone has paid this month or has nothing due.</small></div></div>';
+  h+='<div class="sect"><h2>Backup</h2></div><div class="list"><div class="notif"><span class="act-ic">'+ic('cloud')+'</span><span class="grow" style="white-space:normal"><b class="'+(n.backup?'bad':'')+'" style="white-space:normal">'+(last?'Last backup was '+ago(last):'You haven’t backed up yet')+'</b><small style="white-space:normal">'+(n.backup?'Back up now so your records are safe.':'Your data is safe as of that backup.')+'</small></span><span class="btns" style="flex:none;flex-wrap:nowrap"><button class="btn sm primary" style="min-width:0" data-a="drawerGo" data-p="backup">Back up</button></span></div></div>';
   return{title:'Alerts',html:'<div class="wrap narrow">'+h+'</div>'};
 };
 ACT.dismissNotif=el=>{state.notifDismissed[el.dataset.k]=true;save();render(true)};
@@ -2066,7 +2299,6 @@ function applyTheme(){
   const r=document.documentElement;
   r.dataset.theme=t;r.style.setProperty('--h',state.accentHue);
   r.style.setProperty('--font',(FONTS[state.appFont]||FONTS.system).s);
-  r.style.setProperty('--scale',(state.textScale||100)/100);
   const m=document.querySelector('meta[name=theme-color]');if(m)m.content=t==='dark'?'#10141C':'#F1F4F9';
 }
 async function boot(){
