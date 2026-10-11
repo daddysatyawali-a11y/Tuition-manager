@@ -1,7 +1,7 @@
 /* Tuition Manager service worker: caches the app shell so it opens offline.
    Bump VERSION whenever index.html changes so installed copies pick up the update. */
-const VERSION = 'tm-v5';
-const SHELL = ['./', './index.html', './manifest.json', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png'];
+const VERSION = 'tm-v7';
+const SHELL = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './icon-192-maskable.png', './icon-maskable-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));

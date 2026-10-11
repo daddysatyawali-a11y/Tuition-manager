@@ -7,8 +7,8 @@
 <meta name="description" content="Manage students, fees, tests and attendance for your tuition classes. Works offline, keeps data on your device.">
 <meta name="theme-color" content="#10141C">
 <link rel="manifest" href="manifest.json">
-<link rel="icon" type="image/png" href="icons/icon-192.png">
-<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Tuition Manager">
@@ -243,6 +243,8 @@ body.page #toasts{bottom:calc(1.6rem + env(safe-area-inset-bottom))}
   .hero-in .searchbar{margin:0 0 .9rem}
 }
 
+.meter{height:.6rem;border-radius:99px;background:var(--s3);overflow:hidden;margin-top:.9rem}
+.meter span{display:block;height:100%;border-radius:99px;background:var(--ac);transition:width .5s ease}
 /* ---------- misc components ---------- */
 .stats3{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem}
 .stat{background:var(--s1);border:1px solid var(--line);border-radius:16px;padding:.8rem .8rem}
@@ -411,7 +413,57 @@ const shortInr=v=>{v=Math.round(v);
   if(v>=1e3)return '₹'+(v/1e3).toFixed(1).replace(/\.0$/,'')+'k';
   return '₹'+v};
 const ini=n=>String(n||'').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?';
-const haptic=(p=12)=>{try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}};
+const haptic=(p=12)=>{try{if(state.sfx===false)return;navigator.vibrate&&navigator.vibrate(p)}catch(e){}};
+/* ---------- click, haptic and cash-register sounds (synthesised on the device, no audio files) ---------- */
+let _ac=null,_lastClick=0;
+function ac(){
+  if(_ac)return _ac;
+  const C=window.AudioContext||window.webkitAudioContext;if(!C)return null;
+  try{_ac=new C()}catch(e){_ac=null}return _ac;
+}
+function sfxClick(){
+  if(state.sfx===false)return;
+  const now=Date.now();if(now-_lastClick<70)return;_lastClick=now;
+  haptic(8);
+  const a=ac();if(!a)return;
+  try{
+    if(a.state==='suspended')a.resume();
+    const t=a.currentTime,o=a.createOscillator(),g=a.createGain();
+    o.type='sine';o.frequency.setValueAtTime(1500,t);o.frequency.exponentialRampToValueAtTime(700,t+.03);
+    g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.12,t+.003);g.gain.exponentialRampToValueAtTime(.0001,t+.04);
+    o.connect(g);g.connect(a.destination);o.start(t);o.stop(t+.05);
+  }catch(e){}
+}
+/* "cha-ching": drawer ratchet, thunk, then a bright bell */
+function sfxCash(){
+  if(state.sfx===false)return;
+  haptic([25,50,40]);
+  const a=ac();if(!a)return;
+  try{
+    if(a.state==='suspended')a.resume();
+    const t=a.currentTime;
+    const noise=(t0,dur,freq,vol)=>{
+      const n=Math.floor(a.sampleRate*dur),b=a.createBuffer(1,n,a.sampleRate),d=b.getChannelData(0);
+      for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*(1-i/n);
+      const src=a.createBufferSource(),f=a.createBiquadFilter(),g=a.createGain();
+      src.buffer=b;f.type='bandpass';f.frequency.value=freq;f.Q.value=1.2;
+      g.gain.setValueAtTime(vol,t0);g.gain.exponentialRampToValueAtTime(.0001,t0+dur);
+      src.connect(f);f.connect(g);g.connect(a.destination);src.start(t0);
+    };
+    noise(t,.05,3200,.35);noise(t+.045,.05,2600,.3);noise(t+.09,.06,2000,.3);
+    const th=a.createOscillator(),tg=a.createGain();
+    th.type='sine';th.frequency.setValueAtTime(170,t+.12);th.frequency.exponentialRampToValueAtTime(60,t+.26);
+    tg.gain.setValueAtTime(.0001,t+.12);tg.gain.exponentialRampToValueAtTime(.35,t+.125);tg.gain.exponentialRampToValueAtTime(.0001,t+.3);
+    th.connect(tg);tg.connect(a.destination);th.start(t+.12);th.stop(t+.32);
+    const bell=(f0,t0,vol,dec)=>[[1,1],[2.76,.55],[5.4,.3],[8.93,.15]].forEach(p=>{
+      const o=a.createOscillator(),g=a.createGain(),d=dec/Math.pow(p[0],.35);
+      o.type='sine';o.frequency.value=f0*p[0];
+      g.gain.setValueAtTime(.0001,t0);g.gain.exponentialRampToValueAtTime(vol*p[1],t0+.004);g.gain.exponentialRampToValueAtTime(.0001,t0+d);
+      o.connect(g);g.connect(a.destination);o.start(t0);o.stop(t0+d+.05);
+    });
+    bell(1568,t+.13,.22,1.3);bell(2093,t+.32,.16,1.1);
+  }catch(e){}
+}
 const num=v=>{const n=parseFloat(v);return isNaN(n)?0:n};
 function niceMax(v){if(v<=0)return 1000;const p=Math.pow(10,Math.floor(Math.log10(v)));const n=v/p;const f=n<=1?1:n<=2?2:n<=2.5?2.5:n<=5?5:10;return f*p}
 
@@ -497,7 +549,7 @@ const store={
 
 /* ---------- state ---------- */
 function defState(){return{
-  setupDone:false,loggedOut:false,theme:'dark',accentHue:210,appFont:'system',listView:'list',
+  setupDone:false,loggedOut:false,theme:'dark',accentHue:210,appFont:'system',sfx:true,dueDay:10,homeHide:{qaDebit:true},classFees:{},debits:[],listView:'list',
   teacher:'',brand:'',gender:'male',teacherWhatsapp:'',teacherInstagram:'',teacherYoutube:'',teacherEmail:'',teacherAddress:'',teacherNote:'',
   qrCodeDataUrl:'',upiId:'',sessionStart:'',sessionEnd:'',
   classes:[],activeClass:'All',retiredClasses:[],classColors:{},classGroupLinks:{},
@@ -507,15 +559,16 @@ function defState(){return{
 let state=defState();
 function normalizeState(st){
   const d=defState(),o=Object.assign(d,st||{});
-  ['classes','students','leftStudentTransactions','tests','retiredClasses','paymentModes'].forEach(k=>{if(!Array.isArray(o[k]))o[k]=d[k]});
-  ['classColors','classGroupLinks','notifDismissed'].forEach(k=>{if(!o[k]||typeof o[k]!=='object')o[k]={}});
+  ['classes','students','leftStudentTransactions','tests','retiredClasses','paymentModes','debits'].forEach(k=>{if(!Array.isArray(o[k]))o[k]=d[k]});
+  ['classColors','classGroupLinks','notifDismissed','classFees','homeHide'].forEach(k=>{if(!o[k]||typeof o[k]!=='object')o[k]={}});
   o.students.forEach(s=>{if(!Array.isArray(s.contacts)||!s.contacts.length)s.contacts=[''];if(!s.transactions)s.transactions=[];if(!s.memberships)s.memberships=[]});
   o.leftStudentTransactions.forEach(a=>{if(!a.transactions)a.transactions=[]});
   o.tests.forEach(t=>{if(!t.marks)t.marks={};if(!t.absent)t.absent={}});
   if(!o.paymentModes.length)o.paymentModes=['Cash','UPI'];
   if(!FONTS[o.appFont])o.appFont='system';
   delete o.textScale;
-  o.students.forEach(s=>{if(!Array.isArray(s.plan))s.plan=[]});
+  if(!(o.dueDay>=1&&o.dueDay<=28))o.dueDay=10;
+  o.students.forEach(s=>{if(!Array.isArray(s.plan))s.plan=[];s.free=!!s.free});
   return o;
 }
 let saveT=null;
@@ -564,8 +617,41 @@ const feeAmt=s=>s.feeType==='monthly'?(+s.monthlyFee||0):(+s.totalFees||0);
 const expectedOf=s=>s.feeType==='monthly'?(+s.monthlyFee||0)*monthsSince(s):(+s.totalFees||0);
 const balOf=s=>Math.max(0,expectedOf(s)-paidOf(s));
 const paidThisMonth=s=>s.transactions.some(t=>String(t.date).slice(0,7)===curYM());
-const overdueList=()=>state.students.filter(s=>isActive(s)&&!paidThisMonth(s)&&balOf(s)>0).sort((a,b)=>balOf(b)-balOf(a));
-const defaulterList=()=>overdueList().filter(s=>feeAmt(s)>0);
+/* ---- fee schedule and the ONE "overdue" rule used on Home, Alerts and the bell ----
+   A fee is overdue only when its due date (the fee due day of that month) has passed and it is still unpaid.
+   Payments are applied to the earliest installments first. Upcoming fees and the rest of the total never count. */
+const ord=n=>{const t=['th','st','nd','rd'],v=n%100;return n+(t[(v-20)%10]||t[v]||t[0])};
+const dueDateOf=m=>m+'-'+pad(Math.min(+state.dueDay||10,28));
+const isDuePassed=m=>today()>dueDateOf(m);
+function schedOf(s){
+  if(s.free)return [];
+  if(s.feeType==='monthly'){
+    const f=+s.monthlyFee||0;if(!(f>0))return [];
+    const a=(s.addedDate||today()).slice(0,7),b=(s.leftDate||today()).slice(0,7),out=[];
+    for(let m=a;m<=b&&out.length<240;m=addMonths(m,1))out.push({month:m,amt:f});
+    return out;
+  }
+  return planOf(s).slice().sort((x,y)=>String(x.month).localeCompare(String(y.month))).map(p=>({month:p.month,amt:r2(p.amount)})).filter(x=>x.amt>0);
+}
+function allocRows(rows,paid){
+  let pool=r2(paid);
+  return rows.map(r=>{const got=r2(Math.min(pool,r.amt));pool=r2(pool-got);return{month:r.month,amt:r.amt,got,rem:r2(r.amt-got)}});
+}
+function overdueOf(s){
+  if(!isActive(s)||s.free)return null;
+  const rows=allocRows(schedOf(s),paidOf(s)).filter(r=>r.rem>0&&isDuePassed(r.month));
+  return rows.length?{total:r2(rows.reduce((a,r)=>a+r.rem,0)),rows}:null;
+}
+const overdueList=()=>state.students.filter(s=>overdueOf(s)).sort((a,b)=>overdueOf(b).total-overdueOf(a).total||byName(a,b));
+const overdueMonths=o=>{const n=o.rows.map(r=>mLabel(r.month).split(' ')[0]);return n.length<=3?n.join(' + '):n.length+' months overdue'};
+/* Free / discounted. Discounted is worked out, never typed: a fee below the class default. */
+const classDefault=(c,t)=>{const f=state.classFees[c];return f?(+f[t]||0):0};
+const classFeeText=c=>{const f=state.classFees[c];if(!f)return '';const p=[];if(f.total)p.push(inr(f.total)+' total');if(f.monthly)p.push(inr(f.monthly)+' monthly');return p.length?' · Default fee '+p.join(' / '):''};
+function feeTag(s){
+  if(s.free)return 'Free';
+  const c=(s.memberships[0]||{}).class,d=classDefault(c,s.feeType==='monthly'?'monthly':'total'),f=feeAmt(s);
+  return d>0&&f>0&&f<d?'Discounted':'';
+}
 const nm=o=>o.name||o.originalName||'Student';
 function allTx(){
   const out=[];
@@ -584,7 +670,7 @@ function sessionMonthsElapsed(){
   return Math.max(1,monthDiff(start,end)+1);
 }
 function notifData(){
-  const defaulters=defaulterList();
+  const defaulters=overdueList().map(s=>({s,o:overdueOf(s)}));
   const backup=!state.lastBackupAt||daysSince(state.lastBackupAt)>=7;
   return{defaulters,backup,count:defaulters.length+(backup?1:0)};
 }
@@ -777,7 +863,7 @@ const cnt=(n,money)=>'<span class="num" data-count="'+(+n||0)+'"'+(money?' data-
 let tab='home',stack=[],tabScroll={},rtok=0;
 const TABS={},PAGES={};
 const TAB_DEF=[['home','home','Home'],['students','users','Students'],['payments','card','Payments'],['tests','file','Tests']];
-const DRAWER_DEF=[['attendance','clip','Attendance'],['classes','layers','Classes'],['reports','bars','Reports'],['export','down','Export to Excel'],['backup','cloud','Backup & Restore'],['settings','sliders','Settings'],['about','info','About & Help']];
+const DRAWER_DEF=[['attendance','clip','Attendance'],['classes','layers','Classes'],['debits','card','Debits'],['reports','bars','Reports'],['export','down','Export to Excel'],['backup','cloud','Backup & Restore'],['settings','sliders','Settings'],['about','info','About & Help']];
 const navKey=()=>stack.length?stack[stack.length-1].nav:tab;
 
 function go(p,a={},opts={}){
@@ -845,6 +931,13 @@ window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEvt=
 window.addEventListener('appinstalled',()=>{installEvt=null});
 
 /* --- global delegation --- */
+/* click + vibration only when switching between Home, Students, Payments and Tests.
+   Registered before the action handler so it can compare against the tab we are leaving. */
+document.addEventListener('click',e=>{
+  const el=e.target.closest&&e.target.closest('[data-a="tab"]');
+  if(!el||el.disabled||el.dataset.t===tab)return;
+  sfxClick();
+},true);
 let lpT=null,lpFired=false;
 document.addEventListener('click',e=>{
   if(lpFired){lpFired=false;e.preventDefault();e.stopPropagation();return}
@@ -946,9 +1039,9 @@ ACT.goPayments=()=>setTab('payments');
 
 function overdueHTML(){
   const l=overdueList();if(!l.length)return '';
-  const shown=more.overdue?l:l.slice(0,4);
-  return '<div class="sect"><h2>Overdue fees</h2><span class="pill bad">'+l.length+' student'+(l.length>1?'s':'')+'</span></div><div class="list">'+
-    shown.map(s=>'<button class="row" data-a="stu" data-id="'+s.id+'">'+avatar(s.name,stuColor(s))+'<span class="grow"><b>'+esc(s.name)+'</b><small>'+esc(clsLabel(s))+'</small></span><span class="end"><b class="bal num">'+inr(balOf(s))+'</b></span></button>').join('')+
+  const shown=more.overdue?l:l.slice(0,4),tot=r2(l.reduce((a,s)=>a+overdueOf(s).total,0));
+  return '<div class="sect"><h2>Overdue fees</h2><span class="pill bad">'+inr(tot)+' · '+l.length+' student'+(l.length>1?'s':'')+'</span></div><div class="list">'+
+    shown.map(s=>{const o=overdueOf(s);return '<button class="row" data-a="stu" data-id="'+s.id+'">'+avatar(s.name,stuColor(s))+'<span class="grow"><b>'+esc(s.name)+'</b><small>'+esc(clsLabel(s))+' · '+esc(overdueMonths(o))+'</small></span><span class="end"><b class="bal num">'+inr(o.total)+'</b></span></button>'}).join('')+
     (l.length>4?'<button class="more" data-a="moreToggle" data-w="overdue">'+(more.overdue?'Show less':'Tap to show '+(l.length-4)+' more')+'</button>':'')+'</div>';
 }
 function activityItems(){
@@ -991,41 +1084,72 @@ function homeResults(q){
   return h||'<div class="empty">'+ic('search')+'<b>No matches</b><small>Try a name, class, amount or payment mode.</small></div>';
 }
 
+/* what the teacher chose to show; everything is on unless switched off in Settings */
+const homeOn=k=>!(state.homeHide&&state.homeHide[k]);
+function monthProgress(){
+  const now=curYM(),first=now+'-01';let exp=0,col=0;
+  state.students.forEach(s=>{
+    if(!isActive(s)||s.free)return;
+    const rows=schedOf(s);if(!rows.length)return;
+    const before=r2(s.transactions.reduce((a,t)=>a+(String(t.date)<first?(+t.amount||0):0),0));
+    allocRows(rows,before).forEach(r=>{if(r.month<=now)exp=r2(exp+r.rem)});
+    col=r2(col+s.transactions.reduce((a,t)=>a+(String(t.date).slice(0,7)===now?(+t.amount||0):0),0));
+  });
+  return{expected:exp,collected:col};
+}
+function expectedHTML(){
+  const m=monthProgress(),pct=m.expected>0?Math.min(100,Math.round(m.collected/m.expected*100)):(m.collected>0?100:0);
+  const note=m.collected>=m.expected&&m.expected>0?inr(r2(m.collected-m.expected))+' ahead of what was expected':m.expected>m.collected?inr(r2(m.expected-m.collected))+' still to collect':'Nothing expected yet this month';
+  return '<div class="dash card"><div class="ch-head"><div><small>Collected vs expected</small><div class="ch-val">'+inr(m.collected)+' <small>of '+inr(m.expected)+'</small></div><small style="display:block">'+mLabel(curYM())+'</small></div><span class="pill ac">'+pct+'%</span></div><div class="meter"><span style="width:'+pct+'%"></span></div><small style="display:block;margin-top:.6rem">'+note+'</small></div>';
+}
 TABS.home=function(){
   const hr=new Date().getHours(),g=hr<12?'Good morning':hr<17?'Good afternoon':'Good evening';
   const sal=state.gender==='female'?"Ma'am":'Sir',first=(state.teacher||'').trim().split(/\s+/)[0]||'there';
-  const nf=notifData().count,q=quoteOfDay(0);
+  const nf=notifData().count,q=quoteOfDay(0),on=homeOn;
   const act=state.students.filter(isActive).length;
   const wk=(()=>{const d=new Date();d.setDate(d.getDate()-6);const lim=dstr(d);return state.tests.filter(t=>t.date>=lim&&t.date<=today()).length})();
-  const od=overdueList().length>0;
-  const qa=[['qaStudent','users','Add student'],['qaPay','card','Record payment'],['qaTest','file','Add test record'],['qaAtt','clip','Mark attendance']];
+  if(!on('search'))Q.home='';
+  const qa=[['qaStudent','users','Add student'],['qaPay','card','Record payment'],['qaTest','file','Add test record'],['qaAtt','clip','Mark attendance'],['qaDebit','card','Add debit']].filter(a=>on(a[0]));
+  const tiles=[['tStudents','tileStudents','users',cnt(act),'Active students',0],['tTests','tileTests','file',cnt(wk),'Tests this week',0],['tAlerts','bell','bell',cnt(nf),'Alerts',nf],['tClasses','tileClasses','layers',cnt(state.classes.length),'Active classes',0]].filter(t=>on(t[0]));
   const needSetup=!state.classes.length||!state.sessionStart||!state.sessionEnd;
+  const sq=on('quote'),sf=on('feesCard'),both=sq&&sf,showG=on('greeting'),showS=on('search');
+  const showO=on('overdue')&&overdueList().length>0,showA=on('activity'),half=showO&&showA;
+  const blocks=[];
+  if(showG||showS)blocks.push('<section class="hero"><div class="hero-in">'+(showG?'<div><h2>'+g+', <span style="white-space:nowrap">'+esc(first)+(state.teacher?' '+sal:'')+'</span></h2></div>':'')+(showS?'<div class="searchbar">'+ic('search')+'<input id="hq" type="search" placeholder="Search students, payments, tests" autocomplete="off" value="'+esc(Q.home)+'"></div>':'')+'</div></section>');
+  if(showS)blocks.push('<div id="hres"></div>');
+  if(qa.length)blocks.push('<div class="dash qa">'+qa.map(a=>'<button data-a="'+a[0]+'"><span class="qi">'+ic(a[1])+'</span>'+a[2]+'</button>').join('')+'</div>');
+  if(sq)blocks.push('<div class="dash quote'+(both?' c4':'')+'"><p>“'+esc(q[0])+'”</p><small>'+esc(q[1])+'</small></div>');
+  if(sf)blocks.push('<button class="dash card chartcard'+(both?' c8':'')+'" data-a="openChart" style="text-align:left;width:100%;padding-bottom:1.1rem">'+feesSummaryHTML()+'</button>');
+  if(on('expected'))blocks.push(expectedHTML());
+  if(tiles.length)blocks.push('<div class="dash glance">'+tiles.map(t=>'<button data-a="'+t[1]+'"><span class="gi">'+ic(t[2])+'</span><b>'+t[3]+'</b><small>'+t[4]+'</small>'+(t[5]?'<span class="badge">'+(t[5]>99?'99+':t[5])+'</span>':'')+'</button>').join('')+'</div>');
+  if(needSetup)blocks.push('<div class="dash banner-cta"><span class="qi" style="color:var(--ac)">'+ic('info')+'</span><span class="grow"><b>Finish setup</b><small>'+(!state.classes.length?'Add your first class to start enrolling students.':'Set your academic session in your profile.')+'</small></span><button class="btn sm primary" data-a="finishSetup">Continue</button></div>');
+  if(showO)blocks.push('<div class="dash'+(half?' c6':'')+'" id="w-overdue">'+overdueHTML()+'</div>');
+  if(showA)blocks.push('<div class="dash'+(half?' c6':'')+'" id="w-activity">'+activityHTML()+'</div>');
   return{
     title:state.brand||'Home',
     actions:'<button class="ib" data-a="bell" aria-label="Alerts">'+ic('bell')+(nf?'<span class="badge">'+(nf>99?'99+':nf)+'</span>':'')+'</button>',
-    html:'<div class="wrap"><div class="home">'+
-      '<section class="hero"><div class="hero-in"><div><h2>'+g+', <span style="white-space:nowrap">'+esc(first)+(state.teacher?' '+sal:'')+'</span></h2></div>'+
-      '<div class="searchbar">'+ic('search')+'<input id="hq" type="search" placeholder="Search students, payments, tests" autocomplete="off" value="'+esc(Q.home)+'"></div></div></section>'+
-      '<div id="hres"></div>'+
-      '<div class="dash qa">'+qa.map(a=>'<button data-a="'+a[0]+'"><span class="qi">'+ic(a[1])+'</span>'+a[2]+'</button>').join('')+'</div>'+
-      '<div class="dash quote c4"><p>“'+esc(q[0])+'”</p><small>'+esc(q[1])+'</small></div>'+
-      '<button class="dash card chartcard c8" data-a="openChart" style="text-align:left;width:100%;padding-bottom:1.1rem">'+feesSummaryHTML()+'</button>'+
-      '<div class="dash glance">'+
-        '<button data-a="tileStudents"><span class="gi">'+ic('users')+'</span><b>'+cnt(act)+'</b><small>Active students</small></button>'+
-        '<button data-a="tileTests"><span class="gi">'+ic('file')+'</span><b>'+cnt(wk)+'</b><small>Tests this week</small></button>'+
-        '<button data-a="bell"><span class="gi">'+ic('bell')+'</span><b>'+cnt(nf)+'</b><small>Alerts</small>'+(nf?'<span class="badge">'+(nf>99?'99+':nf)+'</span>':'')+'</button>'+
-        '<button data-a="tileClasses"><span class="gi">'+ic('layers')+'</span><b>'+cnt(state.classes.length)+'</b><small>Active classes</small></button>'+
-      '</div>'+
-      (needSetup?'<div class="dash banner-cta"><span class="qi" style="color:var(--ac)">'+ic('info')+'</span><span class="grow"><b>Finish setup</b><small>'+(!state.classes.length?'Add your first class to start enrolling students.':'Set your academic session in your profile.')+'</small></span><button class="btn sm primary" data-a="finishSetup">Continue</button></div>':'')+
-      '<div class="dash '+(od?'c6':'')+'" id="w-overdue" style="'+(od?'':'display:none')+'">'+overdueHTML()+'</div>'+
-      '<div class="dash '+(od?'c6':'')+'" id="w-activity">'+activityHTML()+'</div>'+
-    '</div></div>',
+    html:'<div class="wrap"><div class="home">'+(blocks.length?blocks.join(''):'<div class="empty">'+ic('sliders')+'<b>Your home screen is empty</b><small>Choose what to show in Settings.</small><button class="btn" data-a="homeCustom">Customize home screen</button></div>')+'</div></div>',
     after(){
-      const hq=$('#hq'),draw=()=>{const q=Q.home.trim();$('#hres').innerHTML=q?homeResults(q):'';$$('.dash').forEach(e=>e.classList.toggle('hidden',!!q))};
+      const hq=$('#hq');if(!hq)return;
+      const draw=()=>{const q=Q.home.trim();$('#hres').innerHTML=q?homeResults(q):'';$$('.dash').forEach(e=>e.classList.toggle('hidden',!!q))};
       hq.oninput=()=>{Q.home=hq.value;draw()};draw();
     }
   };
 };
+/* ---- Settings > Customize home screen: plain checkboxes, order stays the same ---- */
+const HOME_ITEMS=[
+  ['Sections',[['greeting','Greeting'],['search','Search bar'],['quote','Quote of the day'],['feesCard','Fees collected card'],['expected','Collected vs expected'],['overdue','Overdue fees'],['activity','Recent activity']]],
+  ['Quick buttons',[['qaStudent','Add student'],['qaPay','Record payment'],['qaTest','Add test record'],['qaAtt','Mark attendance'],['qaDebit','Add debit']]],
+  ['Stat tiles',[['tStudents','Active students'],['tTests','Tests this week'],['tAlerts','Alerts'],['tClasses','Active classes']]]
+];
+PAGES.homeCustomize=function(){
+  return{title:'Customize home screen',html:'<div class="wrap narrow"><p class="muted">Tick what you want on the home screen. The bell icon at the top always opens Alerts, even if you hide the Alerts tile.</p>'+
+    HOME_ITEMS.map(g=>'<div class="sect"><h2>'+g[0]+'</h2></div><div class="list">'+g[1].map(i=>'<label class="row" style="cursor:pointer"><input type="checkbox" value="'+i[0]+'" data-ch="homeToggle" '+(homeOn(i[0])?'checked':'')+' style="width:1.25rem;height:1.25rem;accent-color:var(--ac);flex:none"><span class="grow"><b>'+i[1]+'</b></span></label>').join('')+'</div>').join('')+
+    '<button class="btn ghost" style="margin-top:1.2rem" data-a="homeReset">Reset to default</button></div>'};
+};
+INP.homeToggle=el=>{if(!state.homeHide)state.homeHide={};if(el.checked)delete state.homeHide[el.value];else state.homeHide[el.value]=true;save()};
+ACT.homeCustom=()=>go('homeCustomize');
+ACT.homeReset=()=>{state.homeHide={qaDebit:true};save();toast('Home screen reset');render(true)};
 ACT.bell=()=>go('notifications',{},{nav:'home'});
 ACT.tileStudents=()=>setTab('students');
 ACT.tileTests=()=>setTab('tests');
@@ -1040,8 +1164,10 @@ ACT.qaAtt=()=>openPage('attendance');
    STUDENTS
    ===================================================================== */
 const balTag=s=>balOf(s)>0?'<span class="bal num">'+inr(balOf(s))+' due</span>':(feeAmt(s)>0?'<span class="good">Paid up</span>':'');
-const stuRow=s=>'<button class="row" data-a="stu" data-id="'+s.id+'">'+avatar(s.name,stuColor(s))+'<span class="grow"><b>'+esc(s.name)+'</b><small>Adm. No. '+esc(s.admissionNo||'—')+' · '+esc(clsLabel(s))+'</small></span>'+ic('chevR')+'</button>';
-const stuTile=s=>'<button class="tile" data-a="stu" data-id="'+s.id+'">'+avatar(s.name,stuColor(s))+'<span class="grow"><b>'+esc(s.name)+'</b><small>'+esc(clsLabel(s))+'</small></span>'+balTag(s)+'</button>';
+/* Students list: name only inside a class tab; name with the class underneath on the All tab */
+const stuSub=s=>state.activeClass==='All'?'<small>'+esc(clsLabel(s))+'</small>':'';
+const stuRow=s=>'<button class="row" data-a="stu" data-id="'+s.id+'">'+avatar(s.name,stuColor(s))+'<span class="grow"><b>'+esc(s.name)+'</b>'+stuSub(s)+'</span></button>';
+const stuTile=s=>'<button class="tile" data-a="stu" data-id="'+s.id+'">'+avatar(s.name,stuColor(s))+'<span class="grow"><b>'+esc(s.name)+'</b>'+stuSub(s)+'</span></button>';
 const listToggle=()=>'<button class="ib" data-a="viewToggle" aria-label="Switch between list and tile view">'+ic(state.listView==='list'?'grid':'list')+'</button>';
 ACT.viewToggle=()=>{state.listView=state.listView==='list'?'tile':'list';save();render(true)};
 ACT.clsTab=el=>{state.activeClass=el.dataset.c;save();render(true)};
@@ -1055,12 +1181,10 @@ TABS.students=function(){
   const act=state.students.filter(isActive),left=state.students.length-act.length;
   const c=state.activeClass;
   const html=classTabs(k=>k==='All'?act.length:act.filter(s=>memOf(s,k)).length);
-  const link=state.activeClass!=='All'?state.classGroupLinks[state.activeClass]:'';
   return{
     title:'Students',
     actions:listToggle()+'<button class="ib" data-a="batchTools" aria-label="Batch tools">'+ic('layers')+'</button>',
     html:'<div class="wrap"><div class="searchbar">'+ic('search')+'<input id="q" type="search" placeholder="Search students" autocomplete="off" value="'+esc(Q.students)+'"></div>'+html+
-      (state.activeClass!=='All'?'<div style="display:flex;align-items:center;gap:.7rem;margin:-.2rem 0 .8rem"><button class="btn sm" data-a="grp" data-lp="grpEdit" data-c="'+esc(state.activeClass)+'">'+ic('chat')+(link?'Open class group':'Add class group link')+'</button>'+(link?'<small>Long-press or right-click to edit</small>':'')+'</div>':'')+
       '<div id="list"></div>'+
       (left?'<button class="btn ghost big" style="margin-top:1rem" data-a="leftList">View left students ('+left+')</button>':'')+'</div>'+
       '<button class="fab" data-a="addStudent">'+ic('plus')+'Add student</button>',
@@ -1079,14 +1203,6 @@ TABS.students=function(){
   };
 };
 ACT.leftList=()=>go('leftStudents');
-ACT.grp=el=>{const l=state.classGroupLinks[el.dataset.c];if(l)window.open(l,'_blank','noopener');else ACT.grpEdit(el)};
-ACT.grpEdit=async el=>{
-  const c=el.dataset.c,cur=state.classGroupLinks[c]||'';
-  const v=await promptSheet({title:'Class group link',body:'Paste the WhatsApp or Telegram invite link for '+c+'.',label:'Invite link',value:cur,placeholder:'https://chat.whatsapp.com/…',extra:cur?'Remove':''});
-  if(v===null)return;
-  if(!v)delete state.classGroupLinks[c];else state.classGroupLinks[c]=/^https?:\/\//i.test(v)?v:'https://'+v;
-  save();toast(v?'Group link saved':'Group link removed');render(true);
-};
 ACT.addStudent=()=>{
   if(!state.classes.length){toast('Add a class first, then enrol students','err');openPage('classes');return}
   go('studentForm',{});
@@ -1107,24 +1223,43 @@ function classOptions(sel,extra){
   return list.map(c=>'<option value="'+esc(c)+'" '+(c===sel?'selected':'')+'>'+esc(c)+'</option>').join('');
 }
 const contactRow=(v,first)=>'<div class="inrow"><input class="inp c-in" type="tel" inputmode="tel" placeholder="Mobile number" value="'+esc(v)+'">'+(first?'':'<button class="ib" data-a="rmRow" aria-label="Remove number">'+ic('x')+'</button>')+'</div>';
-const memRow=(m,first,extra)=>'<div class="inrow"><select class="inp m-class" style="flex:1">'+classOptions(m.class,extra)+'</select><input class="inp m-sub" style="flex:1" placeholder="Subject (optional)" value="'+esc(m.subject||'')+'">'+(first?'':'<button class="ib" data-a="rmRow" aria-label="Remove class">'+ic('x')+'</button>')+'</div>';
+const memRow=(m,first,extra)=>'<div class="inrow"><select class="inp m-class" style="flex:1" data-ch="memClass">'+classOptions(m.class,extra)+'</select><input class="inp m-sub" style="flex:1" placeholder="Subject (optional)" value="'+esc(m.subject||'')+'">'+(first?'':'<button class="ib" data-a="rmRow" aria-label="Remove class">'+ic('x')+'</button>')+'</div>';
 ACT.rmRow=el=>{el.closest('.inrow').remove();if(el.dataset.after==='planSum')planSumUpdate()};
 ACT.addContact=()=>$('#contacts').insertAdjacentHTML('beforeend',contactRow('',false));
 ACT.addMem=()=>$('#mems').insertAdjacentHTML('beforeend',memRow({class:state.activeClass!=='All'?state.activeClass:'',subject:''},false));
-INP.feeType=()=>{const t=document.querySelector('input[name=ft]:checked').value;$('#feeTotalWrap').classList.toggle('hidden',t!=='total');$('#feeMonthWrap').classList.toggle('hidden',t!=='monthly')};
+INP.feeType=()=>{const t=document.querySelector('input[name=ft]:checked').value;$('#feeTotalWrap').classList.toggle('hidden',t!=='total');$('#feeMonthWrap').classList.toggle('hidden',t!=='monthly');feeAutofill()};
+/* new students: fill the fee from the class default until the teacher types their own */
+function feeAutofill(){
+  const box=$('#feeBox');if(!box)return;
+  if(box.dataset.new==='1'){
+    const cls=($('#mems .m-class')||{}).value,t=document.querySelector('input[name=ft]:checked').value,f=$(t==='total'?'#f_total':'#f_month');
+    if(f&&!f.dataset.dirty)f.value=classDefault(cls,t==='total'?'total':'monthly')||'';
+  }
+  feeHint();
+}
+function feeHint(){
+  const h=$('#feeHint');if(!h)return;
+  const cls=($('#mems .m-class')||{}).value,t=document.querySelector('input[name=ft]:checked').value,d=classDefault(cls,t==='total'?'total':'monthly'),v=num($(t==='total'?'#f_total':'#f_month').value);
+  h.textContent=d>0&&v>0&&v<d?'Below the class fee of '+inr(d)+', so this student shows as discounted on their profile.':'';
+}
+INP.feeDirty=el=>{el.dataset.dirty='1';feeHint()};
+INP.memClass=()=>feeAutofill();
+INP.freeToggle=el=>$('#feeBox').classList.toggle('hidden',el.checked);
 
 PAGES.studentForm=function({id}){
   const s=id?byId(id):null;
   const e=s||{name:'',admissionNo:'',father:'',mother:'',contacts:[''],remarks:'',feeType:'total',totalFees:'',monthlyFee:'',addedDate:today(),memberships:[{class:state.activeClass!=='All'?state.activeClass:(sortedClasses()[0]||''),subject:'',status:'active'}]};
   const extra=e.memberships.map(m=>m.class);
+  if(!s){const c0=e.memberships[0].class;e.totalFees=classDefault(c0,'total')||'';e.monthlyFee=classDefault(c0,'monthly')||''}
   return{title:s?'Edit student':'Add student',html:'<div class="wrap narrow"><div class="form">'+
     '<label class="f">Name *<input class="inp" id="f_name" value="'+esc(e.name)+'" autocomplete="off"></label>'+
     '<div class="two stack"><label class="f">Admission no.<input class="inp" id="f_adm" value="'+esc(e.admissionNo)+'"></label><label class="f">Date added<input class="inp" id="f_added" type="date" value="'+esc(e.addedDate)+'"></label></div>'+
     '<div class="two stack"><label class="f">Father’s name<input class="inp" id="f_father" value="'+esc(e.father)+'"></label><label class="f">Mother’s name<input class="inp" id="f_mother" value="'+esc(e.mother)+'"></label></div>'+
     '<div class="fgroup"><h4>Contact numbers</h4><div id="contacts" class="form" style="gap:.5rem">'+e.contacts.map((c,i)=>contactRow(c,i===0)).join('')+'</div><button class="btn sm" style="align-self:flex-start" data-a="addContact">'+ic('plus')+'Add number</button></div>'+
-    '<div class="fgroup"><h4>Fee</h4><div class="seg"><label><input type="radio" name="ft" value="total" data-ch="feeType" '+(e.feeType==='total'?'checked':'')+'><span>One-time total</span></label><label><input type="radio" name="ft" value="monthly" data-ch="feeType" '+(e.feeType==='monthly'?'checked':'')+'><span>Monthly</span></label></div>'+
-      '<label class="f '+(e.feeType==='total'?'':'hidden')+'" id="feeTotalWrap">Total fee (₹)<input class="inp" id="f_total" type="number" inputmode="decimal" min="0" value="'+esc(e.totalFees)+'"></label>'+
-      '<label class="f '+(e.feeType==='monthly'?'':'hidden')+'" id="feeMonthWrap">Monthly fee (₹)<input class="inp" id="f_month" type="number" inputmode="decimal" min="0" value="'+esc(e.monthlyFee)+'"></label></div>'+
+        '<div class="fgroup"><h4>Fee</h4><label class="row" style="cursor:pointer"><input type="checkbox" id="f_free" data-ch="freeToggle" '+(e.free?'checked':'')+' style="width:1.25rem;height:1.25rem;accent-color:var(--ac);flex:none"><span class="grow"><b>Free student</b><small>No fees, so never shown as overdue.</small></span></label>'+
+      '<div id="feeBox" class="form '+(e.free?'hidden':'')+'" style="gap:.7rem" data-new="'+(s?'':'1')+'"><div class="seg"><label><input type="radio" name="ft" value="total" data-ch="feeType" '+(e.feeType==='total'?'checked':'')+'><span>One-time total</span></label><label><input type="radio" name="ft" value="monthly" data-ch="feeType" '+(e.feeType==='monthly'?'checked':'')+'><span>Monthly</span></label></div>'+
+      '<label class="f '+(e.feeType==='total'?'':'hidden')+'" id="feeTotalWrap">Total fee (₹)<input class="inp" id="f_total" type="number" inputmode="decimal" min="0" data-i="feeDirty" value="'+esc(e.totalFees)+'"></label>'+
+      '<label class="f '+(e.feeType==='monthly'?'':'hidden')+'" id="feeMonthWrap">Monthly fee (₹)<input class="inp" id="f_month" type="number" inputmode="decimal" min="0" data-i="feeDirty" value="'+esc(e.monthlyFee)+'"></label><small id="feeHint" class="warn"></small></div></div>'+
     '<div class="fgroup"><h4>Classes and subjects</h4><div id="mems" class="form" style="gap:.5rem">'+e.memberships.map((m,i)=>memRow(m,i===0,extra)).join('')+'</div><button class="btn sm" style="align-self:flex-start" data-a="addMem">'+ic('plus')+'Add another class</button></div>'+
     '<label class="f">Remarks<textarea class="inp" id="f_rem">'+esc(e.remarks)+'</textarea></label>'+
     '<div class="savebar"><button class="btn primary big" data-a="saveStudent" data-id="'+(s?s.id:'')+'">Save student</button></div></div></div>',
@@ -1137,12 +1272,13 @@ ACT.saveStudent=el=>{
   const mems=$$('#mems .inrow').map(r=>({class:$('.m-class',r).value,subject:$('.m-sub',r).value.trim()})).filter(m=>m.class);
   if(!mems.length){toast('Choose at least one class','err');return}
   const feeType=document.querySelector('input[name=ft]:checked').value;
-  const totalFees=num($('#f_total').value),monthlyFee=num($('#f_month').value);
+  const free=$('#f_free').checked;
+  const totalFees=free?0:num($('#f_total').value),monthlyFee=free?0:num($('#f_month').value);
   if(totalFees<0||monthlyFee<0){toast('Fee cannot be negative','err');return}
-  const data={name,admissionNo:$('#f_adm').value.trim(),father:$('#f_father').value.trim(),mother:$('#f_mother').value.trim(),contacts:contacts.length?contacts:[''],remarks:$('#f_rem').value.trim(),feeType,totalFees,monthlyFee,addedDate:$('#f_added').value||today()};
+  const data={free,name,admissionNo:$('#f_adm').value.trim(),father:$('#f_father').value.trim(),mother:$('#f_mother').value.trim(),contacts:contacts.length?contacts:[''],remarks:$('#f_rem').value.trim(),feeType,totalFees,monthlyFee,addedDate:$('#f_added').value||today()};
   if(id){
     const s=byId(id);if(!s)return;
-    Object.assign(s,data);s.memberships=mems.map(m=>({class:m.class,subject:m.subject,status:s.leftDate?'inactive':'active'}));
+    Object.assign(s,data);if(free)s.plan=[];s.memberships=mems.map(m=>({class:m.class,subject:m.subject,status:s.leftDate?'inactive':'active'}));
   }else{
     state.students.push(Object.assign({id:uid(),leftDate:'',transactions:[],memberships:mems.map(m=>({class:m.class,subject:m.subject,status:'active'}))},data));
   }
@@ -1160,11 +1296,11 @@ PAGES.studentProfile=function({id}){
   return{title:'Student',
     actions:'<button class="ib" data-a="editStu" data-id="'+s.id+'" aria-label="Edit student">'+ic('edit')+'</button>',
     html:'<div class="wrap narrow">'+
-    '<div class="phead">'+avatar(s.name,stuColor(s),'lg')+'<h2>'+esc(s.name)+'</h2><small>'+esc(clsLabel(s))+'</small>'+(s.leftDate?'<span class="pill warn">Left on '+fmtDate(s.leftDate)+'</span>':'')+'</div>'+
+    '<div class="phead">'+avatar(s.name,stuColor(s),'lg')+'<h2>'+esc(s.name)+'</h2><small>'+esc(clsLabel(s))+'</small>'+(s.leftDate?'<span class="pill warn">Left on '+fmtDate(s.leftDate)+'</span>':'')+(feeTag(s)?'<span class="pill ac">'+feeTag(s)+'</span>':'')+'</div>'+
     '<div class="stats3">'+stats.map(x=>'<div class="stat"><small>'+x[0]+'</small><b class="'+x[2]+'">'+cnt(x[1],true)+'</b></div>').join('')+'</div>'+
     (monthly?'<small style="display:block;margin:.5rem .2rem 0">Expected till now: '+inr(expectedOf(s))+' for '+monthsSince(s)+' month'+(monthsSince(s)>1?'s':'')+'</small>':'')+
     '<div class="btns" style="margin-top:1rem"><button class="btn primary" data-a="stuPay" data-id="'+s.id+'">'+ic('card')+'Record payment</button><button class="btn" data-a="stuRemind" data-id="'+s.id+'">'+ic('chat')+'Send reminder</button></div>'+
-    (monthly?'':planHTML(s))+
+    ((monthly||s.free)?'':planHTML(s))+
     '<div class="sect"><h2>Details</h2></div><div class="list">'+
       '<div class="kv"><span>Admission no.</span><span>'+esc(s.admissionNo||'—')+'</span></div>'+
       '<div class="kv"><span>Father</span><span>'+esc(s.father||'—')+'</span></div>'+
@@ -1249,7 +1385,7 @@ PAGES.planEdit=function({id}){
     '<div class="row card" style="padding:.8rem 1rem">'+avatar(s.name,stuColor(s))+'<span class="grow"><b>'+esc(s.name)+'</b><small>Total fee '+inr(feeAmt(s))+' · Paid '+inr(paidOf(s))+'</small></span></div>'+
     '<p class="muted">Set the amount due each month. Tap Collect on the student’s profile to record it. Payments are applied to the earliest installment first, so extra money carries into the next one and short payments show as Partial.</p>'+
     '<div id="planRows" class="form" style="gap:.5rem">'+start.map(r=>planRow(r.month,r.amount)).join('')+'</div>'+
-    '<div class="btns"><button class="btn sm" data-a="planAddRow">'+ic('plus')+'Add month</button><button class="btn sm" data-a="planSplit" data-id="'+s.id+'">Split balance equally</button></div>'+
+    '<div class="btns"><button class="btn sm" data-a="planAddRow">'+ic('plus')+'Add month</button><button class="btn sm" data-a="planSplit" data-id="'+s.id+'">Auto-split installments</button></div>'+
     '<div id="planSum" data-fee="'+feeAmt(s)+'" style="font-size:.92rem"></div>'+
     '<div class="savebar"><button class="btn primary big" data-a="planSave" data-id="'+s.id+'">Save plan</button>'+(planOf(s).length?'<button class="btn danger" data-a="planClear" data-id="'+s.id+'">Clear plan</button>':'')+'</div></div></div>',
     after:planSumUpdate};
@@ -1258,16 +1394,59 @@ ACT.planAddRow=()=>{
   const ms=$$('.pl-m').map(i=>i.value).filter(Boolean).sort();
   $('#planRows').insertAdjacentHTML('beforeend',planRow(ms.length?addMonths(ms[ms.length-1],1):curYM(),''));planSumUpdate();
 };
-ACT.planSplit=async el=>{
+/* Auto-split. 'per': fixed amount per month, the remainder goes into the first installment.
+   'eq': equal split over N months (remainder also goes to the first). Always splits the full fee,
+   because payments are applied to the earliest installments first. */
+function splitPlanRows(total,mode,val,start){
+  total=r2(total);
+  if(!(total>0))return{err:'Set the student’s total fee first'};
+  if(!/^\d{4}-\d{2}$/.test(start||''))return{err:'Choose the starting month'};
+  let amounts;
+  if(mode==='per'){
+    const per=r2(val);if(!(per>0))return{err:'Enter the amount per month'};
+    const n=Math.floor(total/per+1e-9);
+    if(n<1)amounts=[total];
+    else{amounts=Array(n).fill(per);amounts[0]=r2(per+r2(total-per*n))}
+  }else{
+    const n=Math.floor(val);if(!(n>=1))return{err:'Enter the number of months'};
+    const each=Math.floor(total/n);if(!(each>0))return{err:'Too many months for this fee'};
+    amounts=Array(n).fill(each);amounts[0]=r2(each+r2(total-each*n));
+  }
+  if(amounts.length>120)return{err:'That makes more than 120 installments'};
+  return{rows:amounts.map((a,i)=>({month:addMonths(start,i),amount:a}))};
+}
+let splitTotal=0;
+function splitRead(){
+  const mode=$('input[name=sp_mode]:checked').value;
+  return splitPlanRows(splitTotal,mode,num($(mode==='per'?'#sp_per':'#sp_n').value),$('#sp_start').value);
+}
+function splitPreview(){
+  const el=$('#sp_prev');if(!el)return;
+  const r=splitRead();
+  if(r.err){el.innerHTML='<span class="warn">'+esc(r.err)+'</span>';return}
+  const n=r.rows.length,a0=r.rows[0].amount,a1=n>1?r.rows[1].amount:a0;
+  el.innerHTML=n+' installment'+(n>1?'s':'')+', '+mLabel(r.rows[0].month)+(n>1?' to '+mLabel(r.rows[n-1].month):'')+'<br>'+(n>1&&a0!==a1?'<b class="num">'+inr(a0)+'</b> first, then '+(n-1)+' × <b class="num">'+inr(a1)+'</b>':n+' × <b class="num">'+inr(a0)+'</b>');
+}
+INP.splitMode=el=>{$('#sp_perWrap').classList.toggle('hidden',el.value!=='per');$('#sp_nWrap').classList.toggle('hidden',el.value==='per');splitPreview()};
+INP.splitPrev=splitPreview;
+ACT.planSplit=el=>{
   const s=byId(el.dataset.id);if(!s)return;
-  const bal=r2(Math.max(0,feeAmt(s)-paidOf(s)));
-  if(!(bal>0)){toast('Nothing left to split','err');return}
-  const v=await promptSheet({title:'Split balance equally',body:'Balance '+inr(bal)+' will be divided over this many months, starting this month.',label:'Number of months',type:'number',value:'5',ok:'Split'});
-  const n=Math.floor(num(v));if(v==null)return;
-  if(!(n>=1&&n<=60)){toast('Enter between 1 and 60 months','err');return}
-  const each=Math.floor(bal/n*100)/100,start=curYM();let left=bal,h='';
-  for(let i=0;i<n;i++){const a=i===n-1?r2(left):each;left=r2(left-a);h+=planRow(addMonths(start,i),a)}
-  $('#planRows').innerHTML=h;planSumUpdate();
+  splitTotal=feeAmt(s);
+  if(!(splitTotal>0)){toast('Set the student’s total fee first','err');return}
+  const start=(s.addedDate||today()).slice(0,7);
+  openSheet('<h3>Auto-split installments</h3><p>Total fee '+inr(splitTotal)+'. Months start from the joining month unless you change it.</p>'+
+    '<div class="seg" style="margin-bottom:.8rem"><label><input type="radio" name="sp_mode" value="per" data-ch="splitMode" checked><span>Amount per month</span></label><label><input type="radio" name="sp_mode" value="eq" data-ch="splitMode"><span>Split equally</span></label></div>'+
+    '<label class="f" id="sp_perWrap">Amount per month (₹)<input class="inp" id="sp_per" type="number" inputmode="decimal" min="0" step="any" placeholder="For example 2000" data-i="splitPrev"></label>'+
+    '<label class="f hidden" id="sp_nWrap">Number of months<input class="inp" id="sp_n" type="number" inputmode="numeric" min="1" step="1" value="5" data-i="splitPrev"></label>'+
+    '<label class="f" style="margin-top:.6rem">Starting month<input class="inp" id="sp_start" type="month" value="'+start+'" data-i="splitPrev"></label>'+
+    '<p class="muted" id="sp_prev" style="margin-top:.7rem"></p>'+
+    '<div class="row-end"><button class="btn ghost" data-a="ovClose">Cancel</button><button class="btn primary" data-a="splitGo">Split</button></div>',
+    sh=>{splitPreview();setTimeout(()=>{const i=$('#sp_per',sh);i&&i.focus()},80)});
+};
+ACT.splitGo=()=>{
+  const r=splitRead();if(r.err){toast(r.err,'err');return}
+  $('#planRows').innerHTML=r.rows.map(x=>planRow(x.month,x.amount)).join('');
+  closeOverlay();planSumUpdate();toast('Split into '+r.rows.length+' installment'+(r.rows.length>1?'s':''));
 };
 ACT.planSave=async el=>{
   const s=byId(el.dataset.id);if(!s)return;
@@ -1289,7 +1468,11 @@ ACT.planClear=async el=>{
 };
 
 /* --- batch add / edit --- */
-const batchAddRow=()=>'<tr><td><input class="inp b-name" placeholder="Name"></td><td><input class="inp b-adm" placeholder="Adm. no."></td><td><select class="inp b-cls">'+classOptions(state.activeClass!=='All'?state.activeClass:'')+'</select></td><td><input class="inp b-sub" placeholder="Subject"></td><td><input class="inp b-ph" type="tel" placeholder="Phone"></td><td><select class="inp b-ft"><option value="total">Total</option><option value="monthly">Monthly</option></select></td><td><input class="inp b-fee" type="number" min="0" placeholder="₹"></td></tr>';
+const batchAddRow=()=>{
+  const c0=state.activeClass!=='All'?state.activeClass:(sortedClasses()[0]||''),d=classDefault(c0,'total');
+  return '<tr><td><input class="inp b-name" placeholder="Name"></td><td><input class="inp b-adm" placeholder="Adm. no."></td><td><select class="inp b-cls" data-ch="batchDef">'+classOptions(state.activeClass!=='All'?state.activeClass:'')+'</select></td><td><input class="inp b-sub" placeholder="Subject"></td><td><input class="inp b-ph" type="tel" placeholder="Phone"></td><td><select class="inp b-ft" data-ch="batchDef"><option value="total">Total</option><option value="monthly">Monthly</option></select></td><td><input class="inp b-fee" type="number" min="0" placeholder="₹" data-i="feeDirty" value="'+(d||'')+'"></td></tr>';
+};
+INP.batchDef=el=>{const r=el.closest('tr'),f=$('.b-fee',r);if(f&&!f.dataset.dirty)f.value=classDefault($('.b-cls',r).value,$('.b-ft',r).value)||''};
 PAGES.batchAdd=function(){
   return{title:'Batch add students',html:'<div class="wrap"><p class="muted" style="margin-bottom:.8rem">Fill one row per student. Rows without a name are skipped. Add father, mother and more phone numbers later from each profile.</p><div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Name</th><th>Adm. no.</th><th>Class</th><th>Subject</th><th>Phone</th><th>Fee type</th><th>Fee (₹)</th></tr></thead><tbody id="brows">'+Array(5).fill(0).map(batchAddRow).join('')+'</tbody></table></div><div class="btns" style="margin-top:.8rem"><button class="btn" data-a="batchRow">'+ic('plus')+'Add row</button></div><div class="savebar"><button class="btn primary big" data-a="batchSave">Save students</button></div></div>'};
 };
@@ -1363,6 +1546,7 @@ ACT.payEdit=el=>go('payForm',{tid:el.dataset.id});
 const EXPORT_OPTS=[
   ['students','Student details','Name, class, contacts, parents, fee type, status'],
   ['payments','Payments and transactions','Every payment with date, mode and remark'],
+  ['debits','Debits','Payments to staff, payments to others and expenses'],
   ['fees','Fee details','Fee, paid and balance for each student, plus installment plans'],
   ['attendance','Attendance','Month-wise present and absent summary per student'],
   ['tests','Test history','Marks of every student, plus a summary for each test']
@@ -1375,7 +1559,7 @@ PAGES.export=function(){
     '<p class="muted">Choose what to include. Each choice becomes its own sheet in one Excel file.</p>'+
     '<div class="list">'+EXPORT_OPTS.map(o=>'<label class="row" style="cursor:pointer"><input type="checkbox" class="exp-cb" value="'+o[0]+'" data-ch="expPick" checked style="width:1.25rem;height:1.25rem;accent-color:var(--ac);flex:none"><span class="grow" style="white-space:normal"><b>'+o[1]+'</b><small style="white-space:normal">'+o[2]+'</small></span></label>').join('')+'</div>'+
     '<button class="btn sm" style="align-self:flex-start" data-a="expAll" id="expAllBtn">Clear all</button>'+
-    '<div class="fgroup"><h4>Date range</h4><div class="two stack"><label class="f">From<input class="inp" type="date" id="x_from" value="'+from0+'"></label><label class="f">To<input class="inp" type="date" id="x_to" value="'+today()+'"></label></div><small>Applies to payments, attendance (by month) and tests. Student and fee details are always a full snapshot.</small></div>'+
+    '<div class="fgroup"><h4>Date range</h4><div class="two stack"><label class="f">From<input class="inp" type="date" id="x_from" value="'+from0+'"></label><label class="f">To<input class="inp" type="date" id="x_to" value="'+today()+'"></label></div><small>Applies to payments, debits, attendance (by month) and tests. Student and fee details are always a full snapshot.</small></div>'+
     '<div class="savebar"><button class="btn primary big" data-a="expRun" id="expRun">'+ic('down')+'Export</button></div></div></div>'};
 };
 function expSync(){
@@ -1389,8 +1573,8 @@ async function buildExportSheets(sel,from,to){
   const sheets=[],inR=d=>{d=String(d);return d>=from&&d<=to},fl=x=>x.feeType==='monthly'?'Monthly':'One-time total';
   const stus=state.students.slice().sort(byName),now=curYM();
   if(sel.has('students')){
-    const rows=[['Name','Admission no.','Class and subject','Father','Mother','Phone numbers','Fee type','Fee (₹)','Date added','Status','Left on','Remarks']];
-    stus.forEach(x=>rows.push([x.name,x.admissionNo||'',clsLabel(x),x.father||'',x.mother||'',x.contacts.filter(c=>String(c).trim()).join(', '),fl(x),feeAmt(x),x.addedDate||'',x.leftDate?'Left':'Active',x.leftDate||'',x.remarks||'']));
+    const rows=[['Name','Admission no.','Class and subject','Father','Mother','Phone numbers','Fee type','Fee (₹)','Fee category','Date added','Status','Left on','Remarks']];
+    stus.forEach(x=>rows.push([x.name,x.admissionNo||'',clsLabel(x),x.father||'',x.mother||'',x.contacts.filter(c=>String(c).trim()).join(', '),fl(x),feeAmt(x),feeTag(x)||'Regular',x.addedDate||'',x.leftDate?'Left':'Active',x.leftDate||'',x.remarks||'']));
     sheets.push({name:'Student details',rows});
   }
   if(sel.has('payments')){
@@ -1402,7 +1586,7 @@ async function buildExportSheets(sel,from,to){
   }
   if(sel.has('fees')){
     const rows=[['Student','Class','Fee type','Fee (₹)','Expected till now (₹)','Paid (₹)','Balance (₹)','Status']];
-    stus.forEach(x=>rows.push([x.name,clsLabel(x),fl(x),feeAmt(x),expectedOf(x),paidOf(x),balOf(x),(feeAmt(x)<=0?'No fee set':balOf(x)>0?'Due':'Paid up')+(x.leftDate?' (Left)':'')]));
+    stus.forEach(x=>rows.push([x.name,clsLabel(x),fl(x),feeAmt(x),expectedOf(x),paidOf(x),balOf(x),(x.free?'Free':feeAmt(x)<=0?'No fee set':balOf(x)>0?'Due':'Paid up')+(x.leftDate?' (Left)':'')]));
     sheets.push({name:'Fee details',rows});
     const ins=[['Student','Class','Month','Amount due (₹)','Collected (₹)','Remaining (₹)','Status']];
     stus.forEach(x=>{if(x.feeType==='monthly')return;planStatus(x).rows.forEach(r=>ins.push([x.name,clsLabel(x),mLabel(r.p.month),r.amt,r.got,r.rem,r.st==='paid'?'Collected':r.st==='partial'?'Partial':(r.p.month<now?'Overdue':'Pending')]))});
@@ -1431,6 +1615,13 @@ async function buildExportSheets(sel,from,to){
       sum.push([t.date,t.name,t.class,t.subject||'',t.maxMarks,st?st.n:0,l.length-(st?st.n:0),st?Math.round(st.avg*100)/100:'',st?Math.round(st.pct*10)/10:'']);
     });
     sheets.push({name:'Test history',rows});sheets.push({name:'Test summary',rows:sum});
+  }
+  if(sel.has('debits')){
+    const l=state.debits.filter(d=>inR(d.date)).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    const rows=[['Date','Type','Remarks','Amount (₹)']];let sum=0;
+    l.forEach(d=>{sum+=+d.amount||0;rows.push([String(d.date),debitLabel(d.type),d.remark||'',+d.amount||0])});
+    rows.push(['Total','','',r2(sum)]);
+    sheets.push({name:'Debits',rows,bold:[rows.length-1]});
   }
   return sheets;
 }
@@ -1490,7 +1681,14 @@ ACT.savePay=el=>{
     if(prev&&prev.p==='payDetail'&&prev.a.tid===tid)back();else replace('payDetail',{tid});
   }else{
     const s=byId(el.dataset.sid);if(!s)return;
-    const id=uid();s.transactions.push({id,date,amount:amt,mode,remark});save();toast('Payment recorded');
+    const hasPlan=s.feeType!=='monthly'&&planOf(s).length>0,b4=hasPlan?planStatus(s):null;
+    const id=uid();s.transactions.push({id,date,amount:amt,mode,remark});save();
+    if(b4){
+      const af=planStatus(s),parts=af.rows.map((r,i)=>[r,r2(r.got-b4.rows[i].got)]).filter(x=>x[1]>0).map(x=>mLabel(x[0].p.month)+' '+inr(x[1]));
+      if(r2(af.extra-b4.extra)>0)parts.push('Beyond plan '+inr(r2(af.extra-b4.extra)));
+      if(parts.length)receiptAdj[id]=parts.join(' · ');
+    }
+    toast('Payment recorded');sfxCash();
     replace('receipt',{tid:id});
   }
 };
@@ -1514,11 +1712,12 @@ ACT.delPay=async el=>{
 };
 
 /* --- receipt confirmation --- */
+const receiptAdj={};
 PAGES.receipt=function({tid}){
   const x=findTx(tid);
   if(!x)return{title:'Receipt',html:'<div class="wrap"><div class="empty"><b>Payment not found</b></div></div>'};
   return{title:'Payment recorded',html:'<div class="wrap narrow" style="text-align:center"><div class="receipt-ok">'+ic('check')+'</div><h2>Payment received</h2><p class="muted">from '+esc(nm(x.owner))+'</p>'+
-    '<div class="bigamt num" style="margin:.8rem 0">'+inr(x.t.amount)+'</div><div class="list" style="text-align:left"><div class="kv"><span>Mode</span><span>'+esc(x.t.mode||'—')+'</span></div><div class="kv"><span>Date</span><span>'+fmtDate(x.t.date)+'</span></div>'+(x.t.remark?'<div class="kv"><span>Remark</span><span>'+esc(x.t.remark)+'</span></div>':'')+'</div>'+
+    '<div class="bigamt num" style="margin:.8rem 0">'+inr(x.t.amount)+'</div><div class="list" style="text-align:left"><div class="kv"><span>Mode</span><span>'+esc(x.t.mode||'—')+'</span></div><div class="kv"><span>Date</span><span>'+fmtDate(x.t.date)+'</span></div>'+(x.t.remark?'<div class="kv"><span>Remark</span><span>'+esc(x.t.remark)+'</span></div>':'')+(receiptAdj[tid]?'<div class="kv"><span>Adjusted against</span><span>'+esc(receiptAdj[tid])+'</span></div>':'')+'</div>'+
     '<div class="btns" style="margin-top:1.2rem"><button class="btn primary" data-a="shareReceipt" data-id="'+tid+'">'+ic('share')+'Share receipt</button><button class="btn" data-a="back">Done</button></div></div>'};
 };
 
@@ -1691,6 +1890,17 @@ ACT.planRemind=async el=>{
   const line=r=>'• '+mLabel(r.p.month)+': '+inr(r.rem)+(r.st==='partial'?' (paid '+inr(r.got)+' of '+inr(r.amt)+')':'');
   let msg='Dear Parent, installment reminder for '+s.name+' ('+clsLabel(s)+'):\n'+(due.length?'Due now:':'Next installment:')+'\n'+list.map(line).join('\n')+'\n'+
     (list.length>1?'Total due: '+inr(r2(list.reduce((a,r)=>a+r.rem,0)))+'\n':'')+'Paid till date: '+inr(paidOf(s))+' of '+inr(feeAmt(s))+'\nKindly pay at the earliest convenience.';
+  if(state.upiId)msg+='\nUPI ID: '+state.upiId;
+  if(qr)msg+='\n(QR code attached)';
+  msg+='\n\n'+[state.teacher,state.brand].filter(Boolean).join(', ');
+  await deliverWA(s,msg,qr);
+};
+ACT.remindOverdue=async el=>{
+  const s=byId(el.dataset.id),o=s&&overdueOf(s);if(!s)return;
+  if(!o){toast('Nothing is overdue for '+s.name);return}
+  const qr=await pickQR();if(qr===undefined)return;
+  const line=r=>'• '+mLabel(r.month)+': '+inr(r.rem)+(r.got>0?' (paid '+inr(r.got)+' of '+inr(r.amt)+')':'');
+  let msg='Dear Parent, fee reminder for '+s.name+' ('+clsLabel(s)+'):\nOverdue:\n'+o.rows.map(line).join('\n')+'\n'+(o.rows.length>1?'Total overdue: '+inr(o.total)+'\n':'')+'Fees are due by the '+ord(+state.dueDay||10)+' of every month.';
   if(state.upiId)msg+='\nUPI ID: '+state.upiId;
   if(qr)msg+='\n(QR code attached)';
   msg+='\n\n'+[state.teacher,state.brand].filter(Boolean).join(', ');
@@ -1880,7 +2090,7 @@ function drawAtt(){
     box.innerHTML='<div class="notice">'+ic('info')+'<div><b>Tuition off on '+fmtDate(date)+'</b><br><small>This day does not count as a working day for '+esc(cls)+'.</small></div></div><div class="btns" style="margin-top:.9rem"><button class="btn primary" data-a="attResume">Resume tuition</button><button class="btn danger" data-a="attRedo">Redo day</button></div>'+summaryBtn;
     return;
   }
-  box.innerHTML=(roster.length?'<div class="sect" style="margin-top:0"><h2>'+esc(cls)+', '+esc(friendlyDay(date))+'</h2><span class="pill" id="attCount">'+attCounts()+'</span></div><div class="list">'+roster.map(s=>'<div class="attrow">'+avatar(s.name,stuColor(s),'sm')+'<span class="grow"><b>'+esc(s.name)+'</b></span><button class="tog '+(AT.absent.has(s.id)?'on':'')+'" data-a="attToggle" data-id="'+s.id+'">'+(AT.absent.has(s.id)?'Absent':'Mark absent')+'</button></div>').join('')+'</div>':'<div class="empty">'+ic('users')+'<b>No active students in '+esc(cls)+'</b><small>Everyone is present by default. Only absences are recorded.</small></div>')+
+  box.innerHTML=(roster.length?'<div class="sect" style="margin-top:0"><h2>'+esc(cls)+', '+esc(friendlyDay(date))+'</h2><span class="pill" id="attCount">'+attCounts()+'</span></div><div class="list">'+roster.map(s=>'<div class="attrow">'+avatar(s.name,stuColor(s),'sm')+'<span class="grow"><b>'+esc(s.name)+'</b></span><button class="tog '+(AT.absent.has(s.id)?'on':'')+'" data-a="attToggle" data-id="'+s.id+'">'+(AT.absent.has(s.id)?'Absent':'Mark absent')+'</button>'+(rec.records[date]&&rec.records[date][s.id]?'<button class="ib" data-a="attMsg" data-id="'+s.id+'" aria-label="Message parent">'+ic('chat')+'</button>':'')+'</div>').join('')+'</div>':'<div class="empty">'+ic('users')+'<b>No active students in '+esc(cls)+'</b><small>Everyone is present by default. Only absences are recorded.</small></div>')+
     '<div class="savebar"><button class="btn primary big" data-a="attSave">Save attendance</button></div>'+
     '<div class="btns"><button class="btn" data-a="attOff">Tuition off</button>'+((saved||AT.absent.size)?'<button class="btn danger" data-a="attRedo">Redo day</button>':'')+'</div>'+summaryBtn;
 }
@@ -1889,6 +2099,11 @@ ACT.attToggle=el=>{
   if(AT.absent.has(id))AT.absent.delete(id);else AT.absent.add(id);
   const on=AT.absent.has(id);el.classList.toggle('on',on);el.textContent=on?'Absent':'Mark absent';
   $('#attCount').textContent=attCounts();
+};
+ACT.attMsg=async el=>{
+  const s=byId(el.dataset.id);if(!s||!AT)return;
+  const msg='Dear Parent, '+s.name+' ('+AT.cls+') was absent from tuition on '+fmtDate(AT.date)+'. Please let us know the reason and help '+s.name.split(' ')[0]+' attend regularly.\n\n'+[state.teacher,state.brand].filter(Boolean).join(', ');
+  await deliverWA(s,msg);
 };
 ACT.attSave=async()=>{
   const c=AT;c.rec.records[c.date]={};c.absent.forEach(id=>{c.rec.records[c.date][id]='absent'});
@@ -1945,7 +2160,7 @@ const taken=(name,except)=>state.classes.concat(state.retiredClasses.map(r=>r.na
 PAGES.classes=function(){
   const l=sortedClasses(),act=state.students.filter(isActive);
   return{title:'Classes',actions:'<button class="ib" data-a="addClass" aria-label="Add class">'+ic('plus')+'</button>',
-    html:'<div class="wrap narrow">'+(l.length?'<div class="list">'+l.map(c=>'<div class="row"><button class="ib" data-a="colorClass" data-c="'+esc(c)+'" aria-label="Choose colour"><span class="cdot" style="--c:'+esc(state.classColors[c]||'')+'"></span></button><span class="grow"><b>'+esc(c)+'</b><small>'+act.filter(s=>memOf(s,c)).length+' active student'+(act.filter(s=>memOf(s,c)).length===1?'':'s')+'</small></span><button class="ib" data-a="renameClass" data-c="'+esc(c)+'" aria-label="Rename">'+ic('edit')+'</button><button class="ib" data-a="retireClass" data-c="'+esc(c)+'" aria-label="Retire">'+ic('archive')+'</button></div>').join('')+'</div>':'<div class="empty">'+ic('layers')+'<b>No classes yet</b><small>Add a class to start enrolling students.</small></div>')+
+    html:'<div class="wrap narrow">'+(l.length?'<div class="list">'+l.map(c=>'<div class="row"><button class="ib" data-a="colorClass" data-c="'+esc(c)+'" aria-label="Choose colour"><span class="cdot" style="--c:'+esc(state.classColors[c]||'')+'"></span></button><span class="grow"><b>'+esc(c)+'</b><small>'+act.filter(s=>memOf(s,c)).length+' active student'+(act.filter(s=>memOf(s,c)).length===1?'':'s')+classFeeText(c)+'</small></span><button class="ib" data-a="classFee" data-c="'+esc(c)+'" aria-label="Default fees">'+ic('card')+'</button><button class="ib" data-a="renameClass" data-c="'+esc(c)+'" aria-label="Rename">'+ic('edit')+'</button><button class="ib" data-a="retireClass" data-c="'+esc(c)+'" aria-label="Retire">'+ic('archive')+'</button></div>').join('')+'</div>':'<div class="empty">'+ic('layers')+'<b>No classes yet</b><small>Add a class to start enrolling students.</small></div>')+
     '<button class="btn primary big" style="margin-top:1rem" data-a="addClass">'+ic('plus')+'Add class</button>'+
     (state.retiredClasses.length?'<div class="list" style="margin-top:1rem"><button class="row" data-a="retiredList"><span class="act-ic">'+ic('archive')+'</span><span class="grow"><b>Retired classes</b><small>'+state.retiredClasses.length+' with history you can still open</small></span>'+ic('chevR')+'</button></div>':'')+'</div>'};
 };
@@ -1955,6 +2170,19 @@ ACT.addClass=async()=>{
   if(!v){toast('Enter a class name','err');return}
   if(taken(v)){toast('A class named “'+v+'” already exists','err');return}
   state.classes.push(v);save();toast('Class added');render(true);
+};
+ACT.classFee=el=>{
+  const c=el.dataset.c,f=state.classFees[c]||{};
+  openSheet('<h3>Default fees for '+esc(c)+'</h3><p>Filled in when you add a student to this class. You can still change it for each student.</p>'+
+    '<label class="f">Total fee (₹)<input class="inp" id="cf_t" type="number" inputmode="decimal" min="0" step="any" value="'+esc(f.total||'')+'"></label>'+
+    '<label class="f" style="margin-top:.6rem">Monthly fee (₹)<input class="inp" id="cf_m" type="number" inputmode="decimal" min="0" step="any" value="'+esc(f.monthly||'')+'"></label>'+
+    '<div class="row-end"><button class="btn ghost" data-a="ovClose">Cancel</button><button class="btn primary" data-a="classFeeSave" data-c="'+esc(c)+'">Save</button></div>');
+};
+ACT.classFeeSave=el=>{
+  const c=el.dataset.c,t=r2(num($('#cf_t').value)),m=r2(num($('#cf_m').value));
+  if(t<0||m<0){toast('Fee cannot be negative','err');return}
+  if(t>0||m>0)state.classFees[c]={total:t,monthly:m};else delete state.classFees[c];
+  save();closeOverlay();toast('Default fees saved');render(true);
 };
 ACT.colorClass=el=>{
   const c=el.dataset.c;
@@ -1972,6 +2200,7 @@ ACT.renameClass=async el=>{
   state.tests.forEach(t=>{if(t.class===o)t.class=n});
   if(state.classColors[o]){state.classColors[n]=state.classColors[o];delete state.classColors[o]}
   if(state.classGroupLinks[o]){state.classGroupLinks[n]=state.classGroupLinks[o];delete state.classGroupLinks[o]}
+  if(state.classFees[o]){state.classFees[n]=state.classFees[o];delete state.classFees[o]}
   if(state.activeClass===o)state.activeClass=n;
   await migrateAttendance(o,n);save();toast('Class renamed');render(true);
 };
@@ -2082,10 +2311,15 @@ PAGES.settings=function(){
     '<div class="sect"><h2>Theme</h2></div><div class="seg">'+[['dark','Dark'],['light','Light'],['system','System']].map(t=>'<label><input type="radio" name="th" value="'+t[0]+'" data-ch="theme" '+(state.theme===t[0]?'checked':'')+'><span>'+t[1]+'</span></label>').join('')+'</div>'+
     '<div class="sect"><h2>Accent colour</h2></div><div class="swatches">'+HUES.map(h=>'<button class="sw '+(state.accentHue===h.h?'on':'')+'" style="--c:hsl('+h.h+' 75% 55%)" data-a="setHue" data-h="'+h.h+'" aria-label="'+h.n+'">'+(state.accentHue===h.h?ic('check'):'')+'</button>').join('')+'</div>'+
     '<div class="sect"><h2>Font</h2></div><div class="chips" style="flex-wrap:wrap">'+Object.keys(FONTS).map(k=>'<button class="chip '+(state.appFont===k?'on':'')+'" style="font-family:'+FONTS[k].s.replace(/"/g,"'")+'" data-a="setFont" data-f="'+k+'">'+FONTS[k].n+'</button>').join('')+'</div>'+
+    '<div class="sect"><h2>Sound and vibration</h2></div><div class="seg">'+[['on','On'],['off','Off']].map(t=>'<label><input type="radio" name="sfx" value="'+t[0]+'" data-ch="sfx" '+((state.sfx!==false)===(t[0]==='on')?'checked':'')+'><span>'+t[1]+'</span></label>').join('')+'</div><small style="display:block;margin-top:.4rem">Tap clicks, a cash-register sound for payments, and a short vibration where the phone supports it.</small>'+
+    '<div class="sect"><h2>Home screen</h2></div><div class="list"><button class="row" data-a="homeCustom"><span class="act-ic">'+ic('sliders')+'</span><span class="grow"><b>Customize home screen</b><small>Choose what to show</small></span>'+ic('chevR')+'</button></div>'+
+    '<div class="sect"><h2>Fee due day</h2></div><label class="f"><select class="inp" data-ch="dueDay">'+Array.from({length:28},(_,i)=>'<option value="'+(i+1)+'" '+((+state.dueDay||10)===i+1?'selected':'')+'>'+ord(i+1)+' of every month</option>').join('')+'</select></label><small style="display:block;margin-top:.4rem">A fee counts as overdue after this day each month. It also appears in reminder messages.</small>'+
     '<div class="sect"><h2>Payment modes</h2></div><div class="chipbox">'+state.paymentModes.map(m=>'<span class="chipx">'+esc(m)+'<button data-a="delMode" data-m="'+esc(m)+'" aria-label="Remove '+esc(m)+'">'+ic('x')+'</button></span>').join('')+'<button class="chip" data-a="addMode">'+ic('plus')+'Add mode</button></div>'+
     '<div class="sect"><h2>More</h2></div><div class="list"><button class="row" data-a="drawerGo" data-p="about"><span class="act-ic">'+ic('info')+'</span><span class="grow"><b>About and help</b></span>'+ic('chevR')+'</button><button class="row" data-a="logout"><span class="act-ic">'+ic('logout')+'</span><span class="grow"><b>Log out</b><small>Locks the app on this device</small></span></button></div>'+
     '<div class="sect"><h2 class="bal">Danger zone</h2></div><div class="card" style="border-color:color-mix(in srgb,var(--bad) 40%,var(--line))"><p class="muted" style="margin-bottom:.8rem">Erase every student, payment, test, attendance record and setting on this device.</p><button class="btn danger" data-a="resetAll">'+ic('trash')+'Master reset</button></div></div>'};
 };
+INP.dueDay=el=>{state.dueDay=Math.min(28,Math.max(1,+el.value||10));save();toast('Fees are due by the '+ord(state.dueDay))};
+INP.sfx=el=>{state.sfx=el.value==='on';save();if(state.sfx)sfxClick()};
 INP.theme=el=>{state.theme=el.value;save();applyTheme()};
 ACT.setHue=el=>{state.accentHue=+el.dataset.h;save();applyTheme();render(true)};
 ACT.setFont=el=>{state.appFont=el.dataset.f;save();applyTheme();render(true)};
@@ -2109,7 +2343,7 @@ ACT.resetAll=()=>{
 };
 async function wipeAll(){
   for(const k of await store.keys(''))await store.del(k);
-  attCache.clear();localStorage.removeItem('tm-drive');
+  attCache.clear();localStorage.removeItem('tm-drive');localStorage.removeItem('tm-prerestore');
   state=defState();applyTheme();stack=[];tab='home';chartSel=null;Object.keys(Q).forEach(k=>Q[k]='');
   await flush();toast('Everything erased');renderRoot();
 }
@@ -2121,11 +2355,12 @@ async function buildBackup(){
   const att={};for(const k of await store.keys('att:')){const r=await store.getJ(k);if(r)att[k]=r}
   return{format:'tuition-manager-backup',version:1,exportedAt:new Date().toISOString(),state,attendance:att};
 }
-async function applyRestore(text){
+async function applyRestore(text,skipSafety){
   let d;try{d=JSON.parse(text)}catch(e){toast('That file is not a valid backup','err');return false}
   if(!d||d.format!=='tuition-manager-backup'||!d.state||typeof d.state!=='object'){toast('That file is not a Tuition Manager backup','err');return false}
   const empty=!state.setupDone||(!state.students.length&&!state.tests.length&&!state.classes.length);
-  if(!empty&&!await confirmDlg('Replace all data?','Restoring completely replaces everything on this device with the backup'+(d.exportedAt?' from '+esc(fmtDate(String(d.exportedAt).slice(0,10))):'')+'. Anything not in the backup is lost.','Replace everything'))return false;
+  if(!empty&&!skipSafety&&!await confirmDlg('Replace all data?','Restoring completely replaces everything on this device with the backup'+(d.exportedAt?' from '+esc(fmtDate(String(d.exportedAt).slice(0,10))):'')+'. Anything not in the backup is lost.','Replace everything'))return false;
+  if(!skipSafety&&!empty){try{localStorage.setItem('tm-prerestore',JSON.stringify(await buildBackup()))}catch(e){}}
   for(const k of await store.keys('att:'))await store.del(k);
   attCache.clear();
   for(const k of Object.keys(d.attendance||{}))if(k.startsWith('att:'))await store.setJ(k,d.attendance[k]);
@@ -2196,18 +2431,77 @@ PAGES.backup=function(){
   return{title:'Backup & Restore',html:'<div class="wrap narrow">'+
     '<div class="'+(due?'notice bad':'card')+'">'+(due?ic('alert'):'')+'<div><b>'+(last?'Last backup '+ago(last):'No backup yet')+'</b><br><small>'+(due?'Back up now so a lost or reset phone doesn’t take your records with it.':'Your data is safe as of that backup.')+'</small></div></div>'+
     '<p class="muted" style="margin:.9rem .2rem">Everything lives only on this device. If you uninstall the app or clear browser data, it is gone for good and there is no server copy. A backup file is your only safety net.</p>'+
-    '<div class="btns"><button class="btn primary" data-a="doBackup">'+ic('down')+'Backup data</button><button class="btn" data-a="restoreBtn">'+ic('up')+'Restore backup</button></div><input type="file" id="rs_file" accept=".json,application/json" class="hidden" data-ch="restoreFile">'+
+    '<div class="btns"><button class="btn primary" data-a="doBackup">'+ic('down')+'Backup data</button><button class="btn" data-a="restoreBtn">'+ic('up')+'Restore backup</button></div>'+(localStorage.getItem('tm-prerestore')?'<button class="btn ghost" style="margin-top:.6rem" data-a="undoRestore">'+ic('undo')+'Undo last restore</button>':'')+'<input type="file" id="rs_file" accept=".json,application/json" class="hidden" data-ch="restoreFile">'+
     '<div style="margin-top:1rem">'+drive+'</div></div>'};
 };
 ACT.doBackup=async()=>{
+  const c=await chooseSheet('Back up your data',[
+    {v:'save',label:'Save to this phone',sub:'Download the backup file to storage',icon:'down'},
+    {v:'share',label:'Share it',sub:'WhatsApp, Drive, email or any other app',icon:'share'}]);
+  if(!c)return;
+  const prev=state.lastBackupAt;
   state.lastBackupAt=new Date().toISOString();await flush();
-  download(new Blob([JSON.stringify(await buildBackup())],{type:'application/json'}),'tuition-manager-backup-'+today()+'.json');
-  toast('Backup downloaded');render(true);
+  const name='tuition-manager-backup-'+today()+'.json',blob=new Blob([JSON.stringify(await buildBackup())],{type:'application/json'});
+  let done=false;
+  if(c==='share'){
+    const file=new File([blob],name,{type:'application/json'});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){
+      try{await navigator.share({files:[file],title:name,text:(state.brand||'Tuition Manager')+' backup'});done=true;toast('Backup shared')}
+      catch(e){if(!(e&&e.name==='AbortError')){download(blob,name);done=true;toast('Sharing failed, so the file was saved to your phone instead','err')}}
+    }else{download(blob,name);done=true;toast('Sharing is not available here, so the file was saved to your phone')}
+  }else{download(blob,name);done=true;toast('Backup saved to your phone')}
+  if(!done){state.lastBackupAt=prev;await flush()}
+  render(true);
+};
+ACT.undoRestore=async()=>{
+  const t=localStorage.getItem('tm-prerestore');if(!t)return;
+  if(!await confirmDlg('Undo the last restore?','This puts back the data you had before you restored a backup.','Undo restore',false))return;
+  if(await applyRestore(t,true))localStorage.removeItem('tm-prerestore');
 };
 ACT.restoreBtn=()=>$('#rs_file').click();
 INP.restoreFile=async el=>{
   const f=el.files[0];if(!f)return;
   const text=await f.text();el.value='';await applyRestore(text);
+};
+
+/* =====================================================================
+   DEBITS: money going out (staff payments, payments to others, expenses)
+   ===================================================================== */
+const DEBIT_TYPES=[['staff','Payment to a fellow employee'],['other','Payment to someone else'],['expense','Expense']];
+const debitLabel=t=>(DEBIT_TYPES.find(x=>x[0]===t)||DEBIT_TYPES[2])[1];
+const receivedIn=ym=>r2(allTx().filter(x=>String(x.t.date).slice(0,7)===ym).reduce((a,x)=>a+(+x.t.amount||0),0));
+PAGES.debits=function(){
+  const l=state.debits.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))),now=curYM();
+  const out=r2(l.filter(d=>String(d.date).slice(0,7)===now).reduce((a,d)=>a+(+d.amount||0),0)),inn=receivedIn(now),net=r2(inn-out);
+  return{title:'Debits',html:'<div class="wrap narrow"><small style="display:block;margin:0 .2rem .5rem">'+mLabel(now)+'</small><div class="stats3"><div class="stat"><small>Collected</small><b>'+inr(inn)+'</b></div><div class="stat"><small>Debits</small><b class="'+(out?'bal':'')+'">'+inr(out)+'</b></div><div class="stat"><small>Net</small><b class="'+(net<0?'bal':'')+'">'+inr(net)+'</b></div></div>'+
+    '<div class="sect"><h2>All debits</h2></div>'+(l.length?'<div class="list">'+l.map(d=>'<button class="row" data-a="debitOpen" data-id="'+d.id+'"><span class="act-ic left">'+ic('card')+'</span><span class="grow"><b>'+esc(d.remark||debitLabel(d.type))+'</b><small>'+fmtDate(d.date)+' · '+esc(debitLabel(d.type))+'</small></span><span class="end"><b class="num">'+inr(d.amount)+'</b></span></button>').join('')+'</div>':'<div class="empty">'+ic('card')+'<b>No debits yet</b><small>Record money you pay out: staff, others or expenses.</small></div>')+'</div><button class="fab" data-a="addDebit">'+ic('plus')+'Add debit</button>'};
+};
+PAGES.debitForm=function({id}){
+  const d=id?state.debits.find(x=>x.id===id):null;
+  if(id&&!d)return{title:'Debit',html:'<div class="wrap"><div class="empty"><b>Debit not found</b></div></div>'};
+  const e=d||{type:'expense',amount:'',remark:'',date:today()};
+  return{title:d?'Edit debit':'Add debit',html:'<div class="wrap narrow"><div class="form">'+
+    '<label class="f">Type<select class="inp" id="d_type">'+DEBIT_TYPES.map(t=>'<option value="'+t[0]+'" '+(e.type===t[0]?'selected':'')+'>'+t[1]+'</option>').join('')+'</select></label>'+
+    '<label class="f">Amount (₹)<input class="inp" id="d_amt" type="number" inputmode="decimal" min="0" step="any" value="'+esc(e.amount)+'" placeholder="0"></label>'+
+    '<label class="f">Remarks<input class="inp" id="d_rem" value="'+esc(e.remark)+'" placeholder="For example, electricity bill" autocomplete="off"></label>'+
+    '<label class="f">Date<input class="inp" id="d_date" type="date" value="'+esc(e.date)+'"></label>'+
+    '<div class="savebar"><button class="btn primary big" data-a="saveDebit" data-id="'+(d?d.id:'')+'">Save debit</button>'+(d?'<button class="btn danger" data-a="delDebit" data-id="'+d.id+'">'+ic('trash')+'Delete</button>':'')+'</div></div></div>'};
+};
+ACT.addDebit=()=>go('debitForm',{});
+ACT.qaDebit=ACT.addDebit;
+ACT.debitOpen=el=>go('debitForm',{id:el.dataset.id});
+ACT.saveDebit=el=>{
+  const amt=r2(num($('#d_amt').value)),date=$('#d_date').value,type=$('#d_type').value,remark=$('#d_rem').value.trim();
+  if(!(amt>0)){toast('Enter an amount greater than 0','err');$('#d_amt').focus();return}
+  if(!date){toast('Choose the date','err');return}
+  const id=el.dataset.id;
+  if(id){const d=state.debits.find(x=>x.id===id);if(!d)return;Object.assign(d,{type,amount:amt,remark,date})}
+  else state.debits.push({id:uid(),type,amount:amt,remark,date});
+  save();toast(id?'Debit updated':'Debit saved');back();
+};
+ACT.delDebit=async el=>{
+  if(!await confirmDlg('Delete this debit?','It is removed from your records.','Delete'))return;
+  state.debits=state.debits.filter(x=>x.id!==el.dataset.id);save();toast('Debit deleted');back();
 };
 
 /* =====================================================================
@@ -2222,7 +2516,11 @@ PAGES.about=function(){
   '<h3>Attendance</h3><p>Everyone is present by default. Tap Mark absent for those who missed the day, or use Tuition off for a holiday. The monthly summary shows each student’s percentage.</p>'+
   '<h3>Classes and reports</h3><p>Rename a class and everything follows. Retire a class when it ends; its history stays available. Reports show subject performance, fee collection and attendance.</p>'+
   '<h3>Export to Excel</h3><p>Open the menu and choose Export to Excel (the download button on the Payments tab opens the same screen). Tick what you want: student details, payments, fee details, attendance and test history. Everything goes into one workbook with a sheet for each choice. The date range limits payments, attendance and tests.</p>'+
-  '<h3>How do I back up my data?</h3><ol><li>Open the menu and choose Backup &amp; Restore.</li><li>Tap Backup data.</li><li>Keep the downloaded file somewhere safe, such as your email or cloud drive.</li></ol>'+
+  '<h3>Fees, due day and overdue</h3><p>Set a default fee for each class on the Classes screen. It fills in when you add a student. Tick Free student for anyone who pays nothing. A fee below the class default shows as Discounted on the profile only, never in anything you share. Choose the fee due day in Settings: a fee counts as overdue only after that day passes, and Home and Alerts show just those overdue amounts.</p>'+
+  '<h3>Debits</h3><p>Open the menu and choose Debits to record money you pay out: to a fellow employee, to someone else, or an expense. Each one has an amount, remarks and a date.</p>'+
+  '<h3>Customize the home screen</h3><p>Open Settings and choose Customize home screen, then tick what to show. The bell icon always opens Alerts.</p>'+
+  '<h3>Absent message</h3><p>After saving attendance, tap the chat icon beside an absent student to message their parent on WhatsApp.</p>'+
+  '<h3>How do I back up my data?</h3><ol><li>Open the menu and choose Backup &amp; Restore.</li><li>Tap Backup data.</li><li>Choose Save to this phone, or Share to send the file through WhatsApp, Drive or email.</li><li>Keep the file somewhere safe.</li></ol>'+
   '<h3>How do I restore?</h3><ol><li>Open Backup &amp; Restore and tap Restore backup.</li><li>Pick your backup file and confirm. Restoring replaces everything on this device.</li></ol>'+
   '<h3>How do I connect Google Drive?</h3><ol><li>The app must be hosted over https with a Google client ID set in its code.</li><li>Open Backup &amp; Restore and tap Connect Google Drive.</li><li>Allow access. Then use Back up to Drive and Restore from Drive.</li></ol>'+
   '<h3>Install the app</h3><p>Use your browser’s Install or Add to Home Screen option. When the browser supports it, Install App also appears in the menu.</p>'+
@@ -2235,9 +2533,9 @@ PAGES.about=function(){
 PAGES.notifications=function(){
   const n=notifData(),last=state.lastBackupAt;let h='';
   h+=n.defaulters.length?
-    '<div class="sect"><h2>Pending fees</h2><span class="pill bad">'+n.defaulters.length+'</span></div><div class="list">'+n.defaulters.map(s=>'<div class="row"><button class="rowmain" data-a="stu" data-id="'+s.id+'">'+avatar(s.name,stuColor(s))+'<span class="grow"><b>'+esc(s.name)+'</b><small>'+esc(clsLabel(s))+'</small></span><span class="end"><b class="bal num">'+inr(balOf(s))+'</b></span></button><button class="btn sm" data-a="remind" data-id="'+s.id+'">Remind</button></div>').join('')+'</div>':
-    '<div class="sect"><h2>Pending fees</h2></div><div class="list"><div class="empty">'+ic('check')+'<b>No pending fees</b><small>Everyone has paid this month or has nothing due.</small></div></div>';
-  h+='<div class="sect"><h2>Backup</h2></div><div class="list"><div class="notif"><span class="act-ic">'+ic('cloud')+'</span><span class="grow" style="white-space:normal"><b class="'+(n.backup?'bad':'')+'" style="white-space:normal">'+(last?'Last backup was '+ago(last):'You haven’t backed up yet')+'</b><small style="white-space:normal">'+(n.backup?'Back up now so your records are safe.':'Your data is safe as of that backup.')+'</small></span><span class="btns" style="flex:none;flex-wrap:nowrap"><button class="btn sm primary" style="min-width:0" data-a="drawerGo" data-p="backup">Back up</button></span></div></div>';
+    '<div class="sect"><h2>Overdue fees</h2><span class="pill bad">'+n.defaulters.length+'</span></div><div class="list">'+n.defaulters.map(x=>'<div class="row"><button class="rowmain" data-a="stu" data-id="'+x.s.id+'">'+avatar(x.s.name,stuColor(x.s))+'<span class="grow"><b>'+esc(x.s.name)+'</b><small>'+esc(clsLabel(x.s))+' · '+esc(overdueMonths(x.o))+'</small></span><span class="end"><b class="bal num">'+inr(x.o.total)+'</b></span></button><button class="btn sm" data-a="remindOverdue" data-id="'+x.s.id+'">Remind</button></div>').join('')+'</div>':
+    '<div class="sect"><h2>Overdue fees</h2></div><div class="list"><div class="empty">'+ic('check')+'<b>No overdue fees</b><small>Nobody is past their due date.</small></div></div>';
+  h+='<div class="sect"><h2>Backup</h2></div><div class="list"><div class="notif"><span class="act-ic">'+ic('cloud')+'</span><span class="grow" style="white-space:normal"><b class="'+(n.backup?'bad':'')+'" style="white-space:normal">'+(last?'Last backup was '+ago(last):'You haven’t backed up yet')+'</b><small style="white-space:normal">'+(n.backup?'Back up now so your records are safe.':'Your data is safe as of that backup.')+'</small></span><span class="btns" style="flex:none;flex-wrap:nowrap"><button class="btn sm primary" style="min-width:0" data-a="doBackup">Back up</button></span></div></div>';
   return{title:'Alerts',html:'<div class="wrap narrow">'+h+'</div>'};
 };
 ACT.dismissNotif=el=>{state.notifDismissed[el.dataset.k]=true;save();render(true)};
