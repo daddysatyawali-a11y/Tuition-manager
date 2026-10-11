@@ -243,6 +243,25 @@ body.page #toasts{bottom:calc(1.6rem + env(safe-area-inset-bottom))}
   .hero-in .searchbar{margin:0 0 .9rem}
 }
 
+.bchart{max-width:46rem;margin:1.1rem auto 0}
+.bplot{position:relative;height:clamp(13rem,34vh,19rem);padding-top:1.2rem}
+.bgrid{position:absolute;left:0;right:0;top:1.2rem;bottom:1.7rem;pointer-events:none}
+.bgrid div{position:absolute;left:0;right:0;height:0;border-top:1px dashed var(--line)}
+.bgrid span{position:absolute;left:0;top:-.55rem;font-size:.64rem;line-height:1;color:var(--tx3);background:var(--s1);padding-right:.3rem}
+.bcols{position:absolute;left:2.6rem;right:0;top:1.2rem;bottom:0;display:flex;align-items:stretch;justify-content:space-between;gap:clamp(.2rem,1.4vw,.7rem)}
+.bcol{flex:1 1 0;min-width:0;max-width:4.6rem;display:flex;flex-direction:column;align-items:center;padding:0;margin:0 auto;background:none;border:0;cursor:pointer}
+.bwrap{flex:1;width:100%;display:flex;align-items:flex-end;justify-content:center}
+.bbar{position:relative;width:78%;border-radius:.45rem .45rem .2rem .2rem;background:var(--ac);opacity:.38;transition:height .95s cubic-bezier(.2,.8,.2,1),opacity .25s}
+.bcol.sel .bbar{opacity:1}
+.bval{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);padding-bottom:.2rem;font-size:.66rem;font-weight:600;color:var(--tx2);white-space:nowrap;display:none}
+.bcol.sel .bval{display:block;color:var(--ac)}
+@media (min-width:640px){.bval{display:block}}
+.blab{height:1.7rem;line-height:1.7rem;font-size:.7rem;color:var(--tx3)}
+.bcol.sel .blab{color:var(--tx);font-weight:700}
+.bcol:disabled{cursor:default}.bcol:disabled .blab{opacity:.4}
+@media (prefers-reduced-motion:reduce){.bbar{transition:none}}
+.ch-foot{display:flex;justify-content:space-between;align-items:center;gap:.6rem;margin-top:.5rem}
+.ch-foot b{font-size:.85rem;color:var(--ac)}
 .meter{height:.6rem;border-radius:99px;background:var(--s3);overflow:hidden;margin-top:.9rem}
 .meter span{display:block;height:100%;border-radius:99px;background:var(--ac);transition:width .5s ease}
 /* ---------- misc components ---------- */
@@ -549,7 +568,7 @@ const store={
 
 /* ---------- state ---------- */
 function defState(){return{
-  setupDone:false,loggedOut:false,theme:'dark',accentHue:210,appFont:'system',sfx:true,dueDay:10,homeHide:{qaDebit:true},classFees:{},debits:[],listView:'list',
+  setupDone:false,loggedOut:false,theme:'dark',accentHue:210,appFont:'system',sfx:true,dueDay:10,homeHide:{qaDebit:true},classFees:{},debits:[],people:[],ledger:[],listView:'list',
   teacher:'',brand:'',gender:'male',teacherWhatsapp:'',teacherInstagram:'',teacherYoutube:'',teacherEmail:'',teacherAddress:'',teacherNote:'',
   qrCodeDataUrl:'',upiId:'',sessionStart:'',sessionEnd:'',
   classes:[],activeClass:'All',retiredClasses:[],classColors:{},classGroupLinks:{},
@@ -559,7 +578,7 @@ function defState(){return{
 let state=defState();
 function normalizeState(st){
   const d=defState(),o=Object.assign(d,st||{});
-  ['classes','students','leftStudentTransactions','tests','retiredClasses','paymentModes','debits'].forEach(k=>{if(!Array.isArray(o[k]))o[k]=d[k]});
+  ['classes','students','leftStudentTransactions','tests','retiredClasses','paymentModes','debits','people','ledger'].forEach(k=>{if(!Array.isArray(o[k]))o[k]=d[k]});
   ['classColors','classGroupLinks','notifDismissed','classFees','homeHide'].forEach(k=>{if(!o[k]||typeof o[k]!=='object')o[k]={}});
   o.students.forEach(s=>{if(!Array.isArray(s.contacts)||!s.contacts.length)s.contacts=[''];if(!s.transactions)s.transactions=[];if(!s.memberships)s.memberships=[]});
   o.leftStudentTransactions.forEach(a=>{if(!a.transactions)a.transactions=[]});
@@ -567,6 +586,12 @@ function normalizeState(st){
   if(!o.paymentModes.length)o.paymentModes=['Cash','UPI'];
   if(!FONTS[o.appFont])o.appFont='system';
   delete o.textScale;
+  if(o.homeHide&&o.homeHide.expected)delete o.homeHide.expected;
+  if(o.debits.length){   // older debit entries move into the new ledger
+    const named={},pid=n=>{if(!named[n]){named[n]={id:uid(),name:n};o.people.push(named[n])}return named[n].id};
+    o.debits.forEach(d=>o.ledger.push({id:d.id||uid(),date:d.date,amount:+d.amount||0,kind:d.type==='expense'?'expense':'pay',personId:d.type==='expense'?'':pid(d.type==='staff'?'Fellow employee':'Someone else'),remark:d.remark||''}));
+    o.debits=[];
+  }
   if(!(o.dueDay>=1&&o.dueDay<=28))o.dueDay=10;
   o.students.forEach(s=>{if(!Array.isArray(s.plan))s.plan=[];s.free=!!s.free});
   return o;
@@ -863,7 +888,7 @@ const cnt=(n,money)=>'<span class="num" data-count="'+(+n||0)+'"'+(money?' data-
 let tab='home',stack=[],tabScroll={},rtok=0;
 const TABS={},PAGES={};
 const TAB_DEF=[['home','home','Home'],['students','users','Students'],['payments','card','Payments'],['tests','file','Tests']];
-const DRAWER_DEF=[['attendance','clip','Attendance'],['classes','layers','Classes'],['debits','card','Debits'],['reports','bars','Reports'],['export','down','Export to Excel'],['backup','cloud','Backup & Restore'],['settings','sliders','Settings'],['about','info','About & Help']];
+const DRAWER_DEF=[['attendance','clip','Attendance'],['classes','layers','Classes'],['ledger','card','Ledger'],['reports','bars','Reports'],['export','down','Export to Excel'],['backup','cloud','Backup & Restore'],['settings','sliders','Settings'],['about','info','About & Help']];
 const navKey=()=>stack.length?stack[stack.length-1].nav:tab;
 
 function go(p,a={},opts={}){
@@ -990,24 +1015,8 @@ function chartModel(){
 }
 function chartInner(first){
   const {mode,pts,sel}=chartModel();
-  const drawn=pts.filter(p=>p.v!=null);
-  const max=niceMax(Math.max(0,...drawn.map(p=>p.v)));
-  const W=640,H=232,L=54,R=16,T=14,B=30,iw=W-L-R,ih=H-T-B,n=pts.length;
-  const X=i=>L+(n===1?iw/2:i*iw/(n-1)),Y=v=>T+ih-(v/max)*ih;
-  let g='<defs><linearGradient id="agrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--ac);stop-opacity:.32"/><stop offset="1" style="stop-color:var(--ac);stop-opacity:0"/></linearGradient></defs>';
-  for(let i=0;i<=4;i++){const v=max*i/4,y=Y(v);g+='<line class="grid" x1="'+L+'" x2="'+(W-R)+'" y1="'+y+'" y2="'+y+'"/><text x="'+(L-8)+'" y="'+(y+4)+'" text-anchor="end">'+shortInr(v)+'</text>'}
-  const step=Math.ceil(n/7);
-  pts.forEach((p,i)=>{if(i%step===0||i===0||i===n-1||i===sel)g+='<text class="'+(i===sel?'sel':'')+'" x="'+X(i)+'" y="'+(H-8)+'" text-anchor="middle">'+mShort(p.m)+'</text>'});
-  const d=[];pts.forEach((p,i)=>{if(p.v!=null)d.push([X(i),Y(p.v)])});
-  if(d.length>1){
-    const path=d.map((c,i)=>(i?'L':'M')+c[0].toFixed(1)+' '+c[1].toFixed(1)).join(' ');
-    g+='<path class="area" d="'+path+' L'+d[d.length-1][0].toFixed(1)+' '+Y(0)+' L'+d[0][0].toFixed(1)+' '+Y(0)+'Z"/><path class="ln '+(first?'anim':'')+'" pathLength="1" d="'+path+'"/>';
-  }
+  const drawn=pts.filter(p=>p.v!=null),max=niceMax(Math.max(0,...drawn.map(p=>p.v)));
   const sp=pts[sel]||{m:curYM(),v:0};
-  if(sp.v!=null)g+='<line class="guide" x1="'+X(sel)+'" x2="'+X(sel)+'" y1="'+T+'" y2="'+(T+ih)+'"/>';
-  pts.forEach((p,i)=>{if(p.v!=null)g+='<circle class="dot '+(i===sel?'s':'')+'" cx="'+X(i)+'" cy="'+Y(p.v)+'" r="'+(i===sel?6:3.5)+'"/>'});
-  const cw=iw/Math.max(1,n-1);
-  pts.forEach((p,i)=>{if(p.v!=null)g+='<rect class="hit" data-a="chartPick" data-i="'+i+'" x="'+(X(i)-cw/2)+'" y="'+T+'" width="'+cw+'" height="'+(ih+B)+'"/>'});
   let mom='';const prev=pts[sel-1];
   if(prev&&prev.v!=null&&sp.v!=null){
     const diff=sp.v-prev.v;
@@ -1017,22 +1026,34 @@ function chartInner(first){
   }
   const val=sp.v==null?0:sp.v;
   const tag=mode==='session'?Math.round(drawn.length/Math.max(1,pts.length)*100)+'% of session':'Last 6 months';
+  const grid=[0,1,2,3,4].map(i=>'<div style="bottom:'+(i*25)+'%"><span>'+shortInr(max*i/4)+'</span></div>').join('');
+  const cols=pts.map((p,i)=>{
+    const h=p.v==null?0:(p.v>0?Math.max(1.5,Math.round(p.v/max*1000)/10):0);
+    return '<button class="bcol'+(i===sel?' sel':'')+'" '+(p.v==null?'disabled':'data-a="chartPick" data-i="'+i+'"')+' aria-label="'+mLabel(p.m)+'"><span class="bwrap"><span class="bbar" data-h="'+h+'" style="height:'+(first?0:h)+'%">'+(p.v>0?'<span class="bval">'+shortInr(p.v)+'</span>':'')+'</span></span><span class="blab">'+mShort(p.m)+'</span></button>';
+  }).join('');
   return '<div class="ch-head"><div><small>'+(mode==='session'?'Session progress':'Fees collected')+'</small><div class="ch-val">'+(first?cnt(val,true):'<span class="num">'+inr(val)+'</span>')+'</div><small style="display:block">'+mLabel(sp.m)+'</small>'+mom+'</div><span class="pill ac">'+tag+'</span></div>'+
-    '<svg class="chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Fees collected by month">'+g+'</svg>';
+    '<div class="bchart" role="img" aria-label="Fees collected by month"><div class="bplot"><div class="bgrid">'+grid+'</div><div class="bcols">'+cols+'</div></div></div>';
 }
 function feesSummaryHTML(){
-  const by=feesByMonth(),now=curYM(),pm=addMonths(now,-1),cur=by[now]||0,prev=by[pm]||0;
+  const by=feesByMonth(),now=curYM(),pm=addMonths(now,-1),cur=by[now]||0,prev=by[pm]||0,m=monthProgress();
   let mom;
   if(prev>0&&cur===prev)mom='<div class="mom flat">'+ic('minus')+'Same as last month</div>';
   else if(prev>0){const pct=Math.round(Math.abs(cur-prev)/prev*100),up=cur>prev;mom='<div class="mom '+(up?'up':'down')+'">'+ic(up?'up2':'down2')+pct+'% '+(up?'more':'less')+' than last month</div>'}
   else if(cur>0)mom='<div class="mom up">'+ic('up2')+'Nothing collected last month</div>';
   else mom='<div class="mom flat">'+ic('minus')+'Nothing collected yet this month</div>';
-  return '<div class="ch-head"><div><small>Fees collected</small><div class="ch-val">'+cnt(cur,true)+'</div><small style="display:block">'+mLabel(now)+'</small>'+mom+'</div><span class="pill ac">Graph'+ic('chevR')+'</span></div>';
+  const pct=m.expected>0?Math.min(100,Math.round(cur/m.expected*100)):(cur>0?100:0);
+  const note=m.expected>0?(cur>=m.expected?inr(r2(cur-m.expected))+' ahead of the '+inr(m.expected)+' expected':inr(r2(m.expected-cur))+' still to collect of '+inr(m.expected)+' expected'):'Nothing expected yet this month';
+  return '<div class="ch-head"><div><small>Fees collected</small><div class="ch-val">'+cnt(cur,true)+'</div><small style="display:block">'+mLabel(now)+'</small>'+mom+'</div><span class="pill ac">Graph'+ic('chevR')+'</span></div>'+
+    '<div class="meter"><span style="width:'+pct+'%"></span></div><div class="ch-foot"><small>'+note+'</small><b class="num">'+pct+'%</b></div>';
 }
 ACT.openChart=()=>go('feesChart',{},{nav:'home'});
 PAGES.feesChart=function(){
   chartSel=null;
-  return{title:'Fees collected',html:'<div class="wrap"><div class="card chartcard" id="chartCard" style="cursor:default">'+chartInner(true)+'</div><div class="btns" style="margin-top:1rem"><button class="btn" data-a="goPayments">'+ic('card')+'All payments</button></div></div>'};
+  return{title:'Fees collected',html:'<div class="wrap"><div class="card chartcard" id="chartCard" style="cursor:default">'+chartInner(true)+'</div><div class="btns" style="margin-top:1rem"><button class="btn" data-a="goPayments">'+ic('card')+'All payments</button></div></div>',
+    after(){
+      const reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches;
+      requestAnimationFrame(()=>requestAnimationFrame(()=>$$('.bbar').forEach((b,i)=>{b.style.transitionDelay=reduce?'0ms':(i*55)+'ms';b.style.height=b.dataset.h+'%'})));
+    }};
 };
 ACT.chartPick=el=>{chartSel=+el.dataset.i;$('#chartCard').innerHTML=chartInner(false)};
 ACT.goPayments=()=>setTab('payments');
@@ -1097,11 +1118,6 @@ function monthProgress(){
   });
   return{expected:exp,collected:col};
 }
-function expectedHTML(){
-  const m=monthProgress(),pct=m.expected>0?Math.min(100,Math.round(m.collected/m.expected*100)):(m.collected>0?100:0);
-  const note=m.collected>=m.expected&&m.expected>0?inr(r2(m.collected-m.expected))+' ahead of what was expected':m.expected>m.collected?inr(r2(m.expected-m.collected))+' still to collect':'Nothing expected yet this month';
-  return '<div class="dash card"><div class="ch-head"><div><small>Collected vs expected</small><div class="ch-val">'+inr(m.collected)+' <small>of '+inr(m.expected)+'</small></div><small style="display:block">'+mLabel(curYM())+'</small></div><span class="pill ac">'+pct+'%</span></div><div class="meter"><span style="width:'+pct+'%"></span></div><small style="display:block;margin-top:.6rem">'+note+'</small></div>';
-}
 TABS.home=function(){
   const hr=new Date().getHours(),g=hr<12?'Good morning':hr<17?'Good afternoon':'Good evening';
   const sal=state.gender==='female'?"Ma'am":'Sir',first=(state.teacher||'').trim().split(/\s+/)[0]||'there';
@@ -1120,7 +1136,6 @@ TABS.home=function(){
   if(qa.length)blocks.push('<div class="dash qa">'+qa.map(a=>'<button data-a="'+a[0]+'"><span class="qi">'+ic(a[1])+'</span>'+a[2]+'</button>').join('')+'</div>');
   if(sq)blocks.push('<div class="dash quote'+(both?' c4':'')+'"><p>“'+esc(q[0])+'”</p><small>'+esc(q[1])+'</small></div>');
   if(sf)blocks.push('<button class="dash card chartcard'+(both?' c8':'')+'" data-a="openChart" style="text-align:left;width:100%;padding-bottom:1.1rem">'+feesSummaryHTML()+'</button>');
-  if(on('expected'))blocks.push(expectedHTML());
   if(tiles.length)blocks.push('<div class="dash glance">'+tiles.map(t=>'<button data-a="'+t[1]+'"><span class="gi">'+ic(t[2])+'</span><b>'+t[3]+'</b><small>'+t[4]+'</small>'+(t[5]?'<span class="badge">'+(t[5]>99?'99+':t[5])+'</span>':'')+'</button>').join('')+'</div>');
   if(needSetup)blocks.push('<div class="dash banner-cta"><span class="qi" style="color:var(--ac)">'+ic('info')+'</span><span class="grow"><b>Finish setup</b><small>'+(!state.classes.length?'Add your first class to start enrolling students.':'Set your academic session in your profile.')+'</small></span><button class="btn sm primary" data-a="finishSetup">Continue</button></div>');
   if(showO)blocks.push('<div class="dash'+(half?' c6':'')+'" id="w-overdue">'+overdueHTML()+'</div>');
@@ -1138,7 +1153,7 @@ TABS.home=function(){
 };
 /* ---- Settings > Customize home screen: plain checkboxes, order stays the same ---- */
 const HOME_ITEMS=[
-  ['Sections',[['greeting','Greeting'],['search','Search bar'],['quote','Quote of the day'],['feesCard','Fees collected card'],['expected','Collected vs expected'],['overdue','Overdue fees'],['activity','Recent activity']]],
+  ['Sections',[['greeting','Greeting'],['search','Search bar'],['quote','Quote of the day'],['feesCard','Fees collected'],['overdue','Overdue fees'],['activity','Recent activity']]],
   ['Quick buttons',[['qaStudent','Add student'],['qaPay','Record payment'],['qaTest','Add test record'],['qaAtt','Mark attendance'],['qaDebit','Add debit']]],
   ['Stat tiles',[['tStudents','Active students'],['tTests','Tests this week'],['tAlerts','Alerts'],['tClasses','Active classes']]]
 ];
@@ -1168,7 +1183,9 @@ const balTag=s=>balOf(s)>0?'<span class="bal num">'+inr(balOf(s))+' due</span>':
 const stuSub=s=>state.activeClass==='All'?'<small>'+esc(clsLabel(s))+'</small>':'';
 const stuRow=s=>'<button class="row" data-a="stu" data-id="'+s.id+'">'+avatar(s.name,stuColor(s))+'<span class="grow"><b>'+esc(s.name)+'</b>'+stuSub(s)+'</span></button>';
 const stuTile=s=>'<button class="tile" data-a="stu" data-id="'+s.id+'">'+avatar(s.name,stuColor(s))+'<span class="grow"><b>'+esc(s.name)+'</b>'+stuSub(s)+'</span></button>';
-const listToggle=()=>'<button class="ib" data-a="viewToggle" aria-label="Switch between list and tile view">'+ic(state.listView==='list'?'grid':'list')+'</button>';
+const smallScreen=()=>window.innerWidth<700;
+const listMode=()=>smallScreen()?'list':state.listView;
+const listToggle=()=>smallScreen()?'':'<button class="ib" data-a="viewToggle" aria-label="Switch between list and tile view">'+ic(state.listView==='list'?'grid':'list')+'</button>';
 ACT.viewToggle=()=>{state.listView=state.listView==='list'?'tile':'list';save();render(true)};
 ACT.clsTab=el=>{state.activeClass=el.dataset.c;save();render(true)};
 function classTabs(counts){
@@ -1196,7 +1213,7 @@ TABS.students=function(){
         if(q)l=l.filter(s=>[s.name,s.father,s.mother,s.admissionNo].some(v=>norm(v).includes(q)));
         l.sort(byName);
         $('#list').innerHTML=!l.length?'<div class="empty">'+ic('users')+'<b>'+(q?'No students match':'No students yet')+'</b><small>'+(q?'Try another name or admission number.':'Tap Add student to enrol your first one.')+'</small></div>':
-          (state.listView==='tile'?'<div class="tiles">'+l.map(stuTile).join('')+'</div>':'<div class="list">'+l.map(stuRow).join('')+'</div>');
+          (listMode()==='tile'?'<div class="tiles">'+l.map(stuTile).join('')+'</div>':'<div class="list">'+l.map(stuRow).join('')+'</div>');
       };
       $('#q').oninput=e=>{Q.students=e.target.value;draw()};draw();
     }
@@ -1508,9 +1525,11 @@ ACT.batchEditSave=()=>{
 /* =====================================================================
    PAYMENTS
    ===================================================================== */
+let payDraw=null;
 TABS.payments=function(){
   const total=totalReceived(),avg=total/sessionMonthsElapsed();
   const remaining=state.students.filter(isActive).reduce((a,s)=>a+balOf(s),0);
+  if(!Q.payFilter)Q.payFilter='all';
   return{
     title:'Payments',
     actions:'<button class="ib" data-a="exportXlsx" aria-label="Export to Excel">'+ic('down')+'</button>',
@@ -1519,34 +1538,42 @@ TABS.payments=function(){
       '<div class="stat"><small>Average / month</small><b>'+cnt(avg,true)+'</b></div>'+
       '<div class="stat"><small>Fees remaining</small><b class="bal '+(remaining?'':'zero')+'">'+cnt(remaining,true)+'</b></div></div>'+
       '<div class="searchbar">'+ic('search')+'<input id="q" type="search" placeholder="Search payments" autocomplete="off" value="'+esc(Q.payments)+'"></div>'+
-      '<div id="list"></div></div><button class="fab" data-a="qaPay">'+ic('plus')+'Record payment</button>',
+      '<div class="seg" style="margin:.8rem 0 .2rem">'+[['all','All'],['fees','Fees'],['debits','Debits'],['credits','Credits']].map(t=>'<label><input type="radio" name="pf" value="'+t[0]+'" data-ch="payFilter" '+(Q.payFilter===t[0]?'checked':'')+'><span>'+t[1]+'</span></label>').join('')+'</div>'+
+      '<div id="list"></div></div><button class="fab" data-a="payNew">'+ic('plus')+'New entry</button>',
     after(){
       const draw=()=>{
-        const q=norm(Q.payments);
-        let l=allTx();
-        if(q)l=l.filter(x=>[nm(x.owner),x.label,x.t.remark,x.t.mode,String(x.t.amount),fmtDate(x.t.date),x.t.date].some(v=>norm(v).includes(q)));
-        l.sort((a,b)=>String(b.t.date).localeCompare(String(a.t.date)));
-        if(!l.length){$('#list').innerHTML='<div class="empty">'+ic('card')+'<b>'+(q?'No payments match':'No payments yet')+'</b><small>'+(q?'Try a different search.':'Record a payment to start your ledger.')+'</small></div>';return}
+        const q=norm(Q.payments),f=Q.payFilter||'all',items=[];
+        if(f==='all'||f==='fees')allTx().forEach(x=>{
+          if(!q||[nm(x.owner),x.label,x.t.remark,x.t.mode,String(x.t.amount),fmtDate(x.t.date),x.t.date].some(v=>norm(v).includes(q)))items.push({d:String(x.t.date),x});
+        });
+        if(f!=='fees')state.ledger.forEach(e=>{
+          if(f==='debits'&&e.kind==='receive')return;if(f==='credits'&&e.kind!=='receive')return;
+          if(q&&![entryTitle(e),e.remark,entryKind(e),String(e.amount),fmtDate(e.date),e.date].some(v=>norm(v).includes(q)))return;
+          items.push({d:String(e.date),e});
+        });
+        items.sort((a,b)=>b.d.localeCompare(a.d));
+        if(!items.length){$('#list').innerHTML='<div class="empty">'+ic('card')+'<b>'+(q?'Nothing matches':'Nothing here yet')+'</b><small>'+(q?'Try a different search.':'Tap New entry to record a fee, a debit or a credit.')+'</small></div>';return}
         let h='',cur='';
-        for(const x of l){
-          const d=String(x.t.date);
-          if(d!==cur){if(cur)h+='</div>';cur=d;h+='<div class="day">'+esc(friendlyDay(d))+'</div><div class="list">'}
-          const stu=x.left?null:x.owner;
+        for(const it of items){
+          if(it.d!==cur){if(cur)h+='</div>';cur=it.d;h+='<div class="day">'+esc(friendlyDay(it.d))+'</div><div class="list">'}
+          if(it.e){h+='<div class="row">'+entryRow(it.e).replace('<button class="row"','<button class="rowmain"')+'</div>';continue}
+          const x=it.x,stu=x.left?null:x.owner;
           h+='<div class="row"><button class="rowmain" data-a="payOpen" data-id="'+x.t.id+'">'+avatar(nm(x.owner),stu?stuColor(stu):'')+'<span class="grow"><b>'+esc(nm(x.owner))+(x.left?' <span class="pill warn">Left</span>':'')+'</b><small>'+esc(x.label)+(x.t.mode||x.t.remark?' · '+esc(x.t.mode||x.t.remark):'')+'</small></span><span class="end"><b class="num">'+inr(x.t.amount)+'</b></span></button><button class="ib" data-a="payEdit" data-id="'+x.t.id+'" aria-label="Edit payment">'+ic('edit')+'</button></div>';
         }
         $('#list').innerHTML=h+'</div>';
       };
-      $('#q').oninput=e=>{Q.payments=e.target.value;draw()};draw();
+      payDraw=draw;$('#q').oninput=e=>{Q.payments=e.target.value;draw()};draw();
     }
   };
 };
+INP.payFilter=el=>{Q.payFilter=el.value;if(payDraw)payDraw()};
 ACT.payEdit=el=>go('payForm',{tid:el.dataset.id});
 
 /* --- export to Excel: choose what goes in the workbook --- */
 const EXPORT_OPTS=[
   ['students','Student details','Name, class, contacts, parents, fee type, status'],
   ['payments','Payments and transactions','Every payment with date, mode and remark'],
-  ['debits','Debits','Payments to staff, payments to others and expenses'],
+  ['ledger','Debits, credits and people','Expenses, payments to people, money received, and each person\'s totals'],
   ['fees','Fee details','Fee, paid and balance for each student, plus installment plans'],
   ['attendance','Attendance','Month-wise present and absent summary per student'],
   ['tests','Test history','Marks of every student, plus a summary for each test']
@@ -1559,7 +1586,7 @@ PAGES.export=function(){
     '<p class="muted">Choose what to include. Each choice becomes its own sheet in one Excel file.</p>'+
     '<div class="list">'+EXPORT_OPTS.map(o=>'<label class="row" style="cursor:pointer"><input type="checkbox" class="exp-cb" value="'+o[0]+'" data-ch="expPick" checked style="width:1.25rem;height:1.25rem;accent-color:var(--ac);flex:none"><span class="grow" style="white-space:normal"><b>'+o[1]+'</b><small style="white-space:normal">'+o[2]+'</small></span></label>').join('')+'</div>'+
     '<button class="btn sm" style="align-self:flex-start" data-a="expAll" id="expAllBtn">Clear all</button>'+
-    '<div class="fgroup"><h4>Date range</h4><div class="two stack"><label class="f">From<input class="inp" type="date" id="x_from" value="'+from0+'"></label><label class="f">To<input class="inp" type="date" id="x_to" value="'+today()+'"></label></div><small>Applies to payments, debits, attendance (by month) and tests. Student and fee details are always a full snapshot.</small></div>'+
+    '<div class="fgroup"><h4>Date range</h4><div class="two stack"><label class="f">From<input class="inp" type="date" id="x_from" value="'+from0+'"></label><label class="f">To<input class="inp" type="date" id="x_to" value="'+today()+'"></label></div><small>Applies to payments, debits and credits, attendance (by month) and tests. Student and fee details are always a full snapshot.</small></div>'+
     '<div class="savebar"><button class="btn primary big" data-a="expRun" id="expRun">'+ic('down')+'Export</button></div></div></div>'};
 };
 function expSync(){
@@ -1616,12 +1643,16 @@ async function buildExportSheets(sel,from,to){
     });
     sheets.push({name:'Test history',rows});sheets.push({name:'Test summary',rows:sum});
   }
-  if(sel.has('debits')){
-    const l=state.debits.filter(d=>inR(d.date)).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
-    const rows=[['Date','Type','Remarks','Amount (₹)']];let sum=0;
-    l.forEach(d=>{sum+=+d.amount||0;rows.push([String(d.date),debitLabel(d.type),d.remark||'',+d.amount||0])});
-    rows.push(['Total','','',r2(sum)]);
-    sheets.push({name:'Debits',rows,bold:[rows.length-1]});
+  if(sel.has('ledger')){
+    const l=state.ledger.filter(e=>inR(e.date)).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    const rows=[['Date','Type','Person','Remarks','Debit (₹)','Credit (₹)']];let dt=0,ct=0;
+    l.forEach(e=>{const cr=e.kind==='receive';if(cr)ct+=+e.amount||0;else dt+=+e.amount||0;
+      rows.push([String(e.date),e.kind==='expense'?'Expense':cr?'Credit (received)':'Debit (paid)',e.kind==='expense'?'':entryTitle(e),e.remark||'',cr?'':(+e.amount||0),cr?(+e.amount||0):''])});
+    rows.push(['Total','','','',r2(dt),r2(ct)]);
+    sheets.push({name:'Debits and credits',rows,bold:[rows.length-1]});
+    const pr=[['Person','Paid (₹)','Received (₹)','Net paid (₹)']];
+    state.people.slice().sort((a,b)=>coll.compare(a.name,b.name)).forEach(p=>{const t=personTotals(p.id,l);pr.push([p.name,t.paid,t.got,t.net])});
+    sheets.push({name:'People ledger',rows:pr});
   }
   return sheets;
 }
@@ -1938,7 +1969,7 @@ TABS.tests=function(){
         if(q)l=l.filter(t=>[t.name,t.subject].some(v=>norm(v).includes(q)));
         l.sort((a,b)=>b.date.localeCompare(a.date));
         $('#list').innerHTML=!l.length?'<div class="empty">'+ic('file')+'<b>'+(q?'No tests match':'No tests yet')+'</b><small>'+(q?'Try another name or subject.':'Add a test and enter marks for the whole class in one go.')+'</small></div>':
-          (state.listView==='tile'?'<div class="tiles">'+l.map(testTile).join('')+'</div>':'<div class="list">'+l.map(testRow).join('')+'</div>');
+          (listMode()==='tile'?'<div class="tiles">'+l.map(testTile).join('')+'</div>':'<div class="list">'+l.map(testRow).join('')+'</div>');
       };
       $('#q').oninput=e=>{Q.tests=e.target.value;draw()};draw();
     }};
@@ -2465,43 +2496,126 @@ INP.restoreFile=async el=>{
 };
 
 /* =====================================================================
-   DEBITS: money going out (staff payments, payments to others, expenses)
+   LEDGER
+   Debit  = money going out: an expense, or a payment to a person
+   Credit = money coming in from a person
+   Every person has their own ledger. Expenses have no person and can only be debits.
    ===================================================================== */
-const DEBIT_TYPES=[['staff','Payment to a fellow employee'],['other','Payment to someone else'],['expense','Expense']];
-const debitLabel=t=>(DEBIT_TYPES.find(x=>x[0]===t)||DEBIT_TYPES[2])[1];
+const personById=id=>state.people.find(p=>p.id===id);
+const entryTitle=e=>e.kind==='expense'?'Expense':(personById(e.personId)||{name:'Unknown person'}).name;
+const entryKind=e=>e.kind==='expense'?'Expense':e.kind==='pay'?'Paid':'Received';
+function personTotals(id,list){
+  let paid=0,got=0;(list||state.ledger).forEach(e=>{if(e.personId!==id)return;if(e.kind==='pay')paid+=+e.amount||0;else if(e.kind==='receive')got+=+e.amount||0});
+  return{paid:r2(paid),got:r2(got),net:r2(paid-got)};
+}
+const netText=n=>n===0?'Settled':(n>0?inr(n)+' paid':inr(-n)+' received');
 const receivedIn=ym=>r2(allTx().filter(x=>String(x.t.date).slice(0,7)===ym).reduce((a,x)=>a+(+x.t.amount||0),0));
-PAGES.debits=function(){
-  const l=state.debits.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))),now=curYM();
-  const out=r2(l.filter(d=>String(d.date).slice(0,7)===now).reduce((a,d)=>a+(+d.amount||0),0)),inn=receivedIn(now),net=r2(inn-out);
-  return{title:'Debits',html:'<div class="wrap narrow"><small style="display:block;margin:0 .2rem .5rem">'+mLabel(now)+'</small><div class="stats3"><div class="stat"><small>Collected</small><b>'+inr(inn)+'</b></div><div class="stat"><small>Debits</small><b class="'+(out?'bal':'')+'">'+inr(out)+'</b></div><div class="stat"><small>Net</small><b class="'+(net<0?'bal':'')+'">'+inr(net)+'</b></div></div>'+
-    '<div class="sect"><h2>All debits</h2></div>'+(l.length?'<div class="list">'+l.map(d=>'<button class="row" data-a="debitOpen" data-id="'+d.id+'"><span class="act-ic left">'+ic('card')+'</span><span class="grow"><b>'+esc(d.remark||debitLabel(d.type))+'</b><small>'+fmtDate(d.date)+' · '+esc(debitLabel(d.type))+'</small></span><span class="end"><b class="num">'+inr(d.amount)+'</b></span></button>').join('')+'</div>':'<div class="empty">'+ic('card')+'<b>No debits yet</b><small>Record money you pay out: staff, others or expenses.</small></div>')+'</div><button class="fab" data-a="addDebit">'+ic('plus')+'Add debit</button>'};
+function monthFlow(ym){
+  const inM=e=>String(e.date).slice(0,7)===ym;
+  const credits=state.ledger.filter(e=>e.kind==='receive'&&inM(e)).reduce((a,e)=>a+(+e.amount||0),0);
+  const out=state.ledger.filter(e=>e.kind!=='receive'&&inM(e)).reduce((a,e)=>a+(+e.amount||0),0);
+  const inn=r2(receivedIn(ym)+credits);return{inn,out:r2(out),net:r2(inn-out)};
+}
+function addPerson(name){
+  const ex=state.people.find(p=>p.name.toLowerCase()===name.toLowerCase());if(ex)return ex.id;
+  const p={id:uid(),name};state.people.push(p);save();return p.id;
+}
+const entryRow=(e,title)=>'<button class="row" data-a="entryOpen" data-id="'+e.id+'"><span class="act-ic '+(e.kind==='receive'?'pay':'left')+'">'+ic(e.kind==='receive'?'up2':'down2')+'</span><span class="grow"><b>'+esc(title||e.remark||entryTitle(e))+'</b><small>'+fmtDate(e.date)+' · '+entryKind(e)+(title&&e.remark?' · '+esc(e.remark):'')+'</small></span><span class="end"><b class="num '+(e.kind==='receive'?'good':'')+'">'+(e.kind==='receive'?'+':'−')+inr(e.amount)+'</b></span></button>';
+const byDateDesc=(a,b)=>String(b.date).localeCompare(String(a.date));
+
+PAGES.ledger=function(){
+  const now=curYM(),f=monthFlow(now);
+  const ppl=state.people.map(p=>({p,t:personTotals(p.id),last:state.ledger.filter(e=>e.personId===p.id).sort(byDateDesc).map(e=>e.date)[0]||''})).sort((a,b)=>String(b.last).localeCompare(String(a.last))||coll.compare(a.p.name,b.p.name));
+  const exp=state.ledger.filter(e=>e.kind==='expense').sort(byDateDesc);
+  return{title:'Ledger',html:'<div class="wrap narrow"><small style="display:block;margin:0 .2rem .5rem">'+mLabel(now)+'</small><div class="stats3"><div class="stat"><small>Money in</small><b>'+inr(f.inn)+'</b></div><div class="stat"><small>Money out</small><b class="'+(f.out?'bal':'')+'">'+inr(f.out)+'</b></div><div class="stat"><small>Net</small><b class="'+(f.net<0?'bal':'')+'">'+inr(f.net)+'</b></div></div>'+
+    '<div class="sect"><h2>People</h2><button class="btn sm" data-a="personAdd">'+ic('plus')+'Add person</button></div>'+
+    (ppl.length?'<div class="list">'+ppl.map(x=>'<button class="row" data-a="personOpen" data-id="'+x.p.id+'">'+avatar(x.p.name,'')+'<span class="grow"><b>'+esc(x.p.name)+'</b><small>Paid '+inr(x.t.paid)+' · Received '+inr(x.t.got)+'</small></span><span class="end"><b class="num">'+netText(x.t.net)+'</b></span></button>').join('')+'</div>':'<div class="list"><div class="row"><small>No people yet. Add someone you pay or receive money from.</small></div></div>')+
+    '<div class="sect"><h2>Expenses</h2></div>'+(exp.length?'<div class="list">'+exp.map(e=>entryRow(e)).join('')+'</div>':'<div class="list"><div class="row"><small>No expenses yet.</small></div></div>')+
+    '</div><button class="fab" data-a="ledgerNew">'+ic('plus')+'New entry</button>'};
 };
-PAGES.debitForm=function({id}){
-  const d=id?state.debits.find(x=>x.id===id):null;
-  if(id&&!d)return{title:'Debit',html:'<div class="wrap"><div class="empty"><b>Debit not found</b></div></div>'};
-  const e=d||{type:'expense',amount:'',remark:'',date:today()};
-  return{title:d?'Edit debit':'Add debit',html:'<div class="wrap narrow"><div class="form">'+
-    '<label class="f">Type<select class="inp" id="d_type">'+DEBIT_TYPES.map(t=>'<option value="'+t[0]+'" '+(e.type===t[0]?'selected':'')+'>'+t[1]+'</option>').join('')+'</select></label>'+
-    '<label class="f">Amount (₹)<input class="inp" id="d_amt" type="number" inputmode="decimal" min="0" step="any" value="'+esc(e.amount)+'" placeholder="0"></label>'+
-    '<label class="f">Remarks<input class="inp" id="d_rem" value="'+esc(e.remark)+'" placeholder="For example, electricity bill" autocomplete="off"></label>'+
-    '<label class="f">Date<input class="inp" id="d_date" type="date" value="'+esc(e.date)+'"></label>'+
-    '<div class="savebar"><button class="btn primary big" data-a="saveDebit" data-id="'+(d?d.id:'')+'">Save debit</button>'+(d?'<button class="btn danger" data-a="delDebit" data-id="'+d.id+'">'+ic('trash')+'Delete</button>':'')+'</div></div></div>'};
+PAGES.person=function({id}){
+  const p=personById(id);
+  if(!p)return{title:'Person',html:'<div class="wrap"><div class="empty"><b>Person not found</b></div></div>'};
+  const t=personTotals(id),l=state.ledger.filter(e=>e.personId===id).sort(byDateDesc);
+  return{title:p.name,html:'<div class="wrap narrow"><div class="stats3"><div class="stat"><small>Paid</small><b>'+inr(t.paid)+'</b></div><div class="stat"><small>Received</small><b class="good">'+inr(t.got)+'</b></div><div class="stat"><small>'+(t.net<0?'Net received':'Net paid')+'</small><b>'+inr(Math.abs(t.net))+'</b></div></div>'+
+    '<div class="btns" style="margin:1rem 0"><button class="btn primary" data-a="entryNew" data-kind="pay" data-p="'+id+'">'+ic('down2')+'I paid</button><button class="btn" data-a="entryNew" data-kind="receive" data-p="'+id+'">'+ic('up2')+'I received</button></div>'+
+    '<div class="sect"><h2>Ledger</h2></div>'+(l.length?'<div class="list">'+l.map(e=>entryRow(e,e.remark||entryKind(e))).join('')+'</div>':'<div class="empty">'+ic('card')+'<b>No entries yet</b><small>Use I paid or I received to start this ledger.</small></div>')+
+    '<div class="btns" style="margin-top:1.6rem"><button class="btn sm" data-a="personRename" data-id="'+id+'">'+ic('edit')+'Rename</button><button class="btn sm danger" data-a="personDelete" data-id="'+id+'">'+ic('trash')+'Delete person</button></div></div>'};
 };
-ACT.addDebit=()=>go('debitForm',{});
-ACT.qaDebit=ACT.addDebit;
-ACT.debitOpen=el=>go('debitForm',{id:el.dataset.id});
-ACT.saveDebit=el=>{
-  const amt=r2(num($('#d_amt').value)),date=$('#d_date').value,type=$('#d_type').value,remark=$('#d_rem').value.trim();
-  if(!(amt>0)){toast('Enter an amount greater than 0','err');$('#d_amt').focus();return}
+PAGES.entryForm=function({id,kind,personId}){
+  const e=id?state.ledger.find(x=>x.id===id):null;
+  if(id&&!e)return{title:'Entry',html:'<div class="wrap"><div class="empty"><b>Entry not found</b></div></div>'};
+  const k=e?e.kind:kind,pid=e?e.personId:(personId||''),p=pid?personById(pid):null;
+  if(k!=='expense'&&!p)return{title:'Entry',html:'<div class="wrap"><div class="empty"><b>Person not found</b></div></div>'};
+  const head=k==='expense'?'Expense':k==='pay'?'Paying '+p.name:'Receiving from '+p.name;
+  const v=e||{amount:'',remark:'',date:today()};
+  return{title:e?'Edit entry':(k==='expense'?'Add expense':k==='pay'?'Add debit':'Add credit'),html:'<div class="wrap narrow"><div class="form">'+
+    '<div class="card" style="display:flex;align-items:center;gap:.8rem"><span class="act-ic '+(k==='receive'?'pay':'left')+'">'+ic(k==='receive'?'up2':'down2')+'</span><span class="grow"><b>'+esc(head)+'</b><small style="display:block">'+(k==='receive'?'Credit, money in':'Debit, money out')+'</small></span></div>'+
+    '<label class="f">Amount (₹)<input class="inp" id="d_amt" type="number" inputmode="decimal" min="0" step="any" value="'+esc(v.amount)+'" placeholder="0"></label>'+
+    '<label class="f">Remarks<input class="inp" id="d_rem" value="'+esc(v.remark)+'" placeholder="Optional" autocomplete="off"></label>'+
+    '<label class="f">Date<input class="inp" id="d_date" type="date" value="'+esc(v.date)+'"></label>'+
+    '<div class="savebar"><button class="btn primary big" data-a="saveEntry" data-id="'+(e?e.id:'')+'" data-kind="'+k+'" data-p="'+esc(pid)+'">Save</button>'+(e?'<button class="btn danger" data-a="delEntry" data-id="'+e.id+'">'+ic('trash')+'Delete</button>':'')+'</div></div></div>'};
+};
+ACT.saveEntry=el=>{
+  const amount=r2(num($('#d_amt').value)),date=$('#d_date').value,remark=$('#d_rem').value.trim(),id=el.dataset.id;
+  if(!(amount>0)){toast('Enter an amount greater than 0','err');$('#d_amt').focus();return}
   if(!date){toast('Choose the date','err');return}
-  const id=el.dataset.id;
-  if(id){const d=state.debits.find(x=>x.id===id);if(!d)return;Object.assign(d,{type,amount:amt,remark,date})}
-  else state.debits.push({id:uid(),type,amount:amt,remark,date});
-  save();toast(id?'Debit updated':'Debit saved');back();
+  if(id){const e=state.ledger.find(x=>x.id===id);if(!e)return;Object.assign(e,{amount,remark,date})}
+  else{const kind=el.dataset.kind;state.ledger.push({id:uid(),date,amount,kind,personId:kind==='expense'?'':el.dataset.p,remark})}
+  save();toast(id?'Entry updated':'Entry saved');back();
 };
-ACT.delDebit=async el=>{
-  if(!await confirmDlg('Delete this debit?','It is removed from your records.','Delete'))return;
-  state.debits=state.debits.filter(x=>x.id!==el.dataset.id);save();toast('Debit deleted');back();
+ACT.delEntry=async el=>{
+  if(!await confirmDlg('Delete this entry?','It is removed from the ledger.','Delete'))return;
+  state.ledger=state.ledger.filter(x=>x.id!==el.dataset.id);save();toast('Entry deleted');back();
+};
+ACT.entryOpen=el=>go('entryForm',{id:el.dataset.id});
+ACT.entryNew=el=>go('entryForm',{kind:el.dataset.kind,personId:el.dataset.p});
+ACT.personOpen=el=>go('person',{id:el.dataset.id});
+ACT.personAdd=async()=>{
+  const n=await promptSheet({title:'New person',body:'Their name stays in your ledger so you can see everything with them.',label:'Name',placeholder:'For example, Ramesh'});
+  if(!n)return;const had=state.people.length;addPerson(n);toast(state.people.length>had?'Person added':'That person is already in your ledger');render(true);
+};
+ACT.personRename=async el=>{
+  const p=personById(el.dataset.id);if(!p)return;
+  const n=await promptSheet({title:'Rename',label:'Name',value:p.name});if(!n)return;
+  p.name=n;save();toast('Renamed');render(true);
+};
+ACT.personDelete=async el=>{
+  const p=personById(el.dataset.id);if(!p)return;const n=state.ledger.filter(e=>e.personId===p.id).length;
+  if(!await confirmDlg('Delete '+esc(p.name)+'?',n?'This also deletes their '+n+' ledger entr'+(n>1?'ies':'y')+'.':'They have no entries.','Delete person'))return;
+  state.ledger=state.ledger.filter(e=>e.personId!==p.id);state.people=state.people.filter(x=>x.id!==p.id);save();toast('Person deleted');back();
+};
+/* choose a person (or add one by name), then open the entry form */
+async function pickPerson(kind){
+  let pid=null;
+  if(state.people.length){
+    const c=await chooseSheet(kind==='pay'?'Pay whom?':'Received from whom?',state.people.slice().sort((a,b)=>coll.compare(a.name,b.name)).map(p=>({v:p.id,label:p.name,sub:netText(personTotals(p.id).net),icon:'user'})).concat([{v:'__new',label:'Add a new person',icon:'plus'}]));
+    if(!c)return;if(c!=='__new')pid=c;
+  }
+  if(!pid){
+    const n=await promptSheet({title:'New person',body:'Their name stays in your ledger so you can see everything with them.',label:'Name',placeholder:'For example, Ramesh'});
+    if(!n)return;pid=addPerson(n);
+  }
+  go('entryForm',{kind,personId:pid});
+}
+async function debitFlow(){
+  const c=await chooseSheet('Debit',[{v:'expense',label:'Expense',sub:'Rent, bills, materials and similar',icon:'card'},{v:'pay',label:'Pay someone',sub:'Staff or anyone else, kept in their ledger',icon:'user'}],'Money going out');
+  if(c==='expense')go('entryForm',{kind:'expense'});else if(c==='pay')await pickPerson('pay');
+}
+ACT.qaDebit=debitFlow;
+/* the "New entry" button on the Payments tab, and the one on the Ledger screen */
+ACT.payNew=async()=>{
+  const c=await chooseSheet('What are you recording?',[
+    {v:'fee',label:'Fee payment',sub:'Money received from a student',icon:'users'},
+    {v:'debit',label:'Debit',sub:'An expense, or a payment to someone',icon:'down2'},
+    {v:'credit',label:'Credit',sub:'Money received from a person',icon:'up2'}]);
+  if(c==='fee')go('payPick');else if(c==='debit')await debitFlow();else if(c==='credit')await pickPerson('receive');
+};
+ACT.ledgerNew=async()=>{
+  const c=await chooseSheet('New entry',[
+    {v:'debit',label:'Debit',sub:'An expense, or a payment to someone',icon:'down2'},
+    {v:'credit',label:'Credit',sub:'Money received from a person',icon:'up2'}]);
+  if(c==='debit')await debitFlow();else if(c==='credit')await pickPerson('receive');
 };
 
 /* =====================================================================
@@ -2517,7 +2631,7 @@ PAGES.about=function(){
   '<h3>Classes and reports</h3><p>Rename a class and everything follows. Retire a class when it ends; its history stays available. Reports show subject performance, fee collection and attendance.</p>'+
   '<h3>Export to Excel</h3><p>Open the menu and choose Export to Excel (the download button on the Payments tab opens the same screen). Tick what you want: student details, payments, fee details, attendance and test history. Everything goes into one workbook with a sheet for each choice. The date range limits payments, attendance and tests.</p>'+
   '<h3>Fees, due day and overdue</h3><p>Set a default fee for each class on the Classes screen. It fills in when you add a student. Tick Free student for anyone who pays nothing. A fee below the class default shows as Discounted on the profile only, never in anything you share. Choose the fee due day in Settings: a fee counts as overdue only after that day passes, and Home and Alerts show just those overdue amounts.</p>'+
-  '<h3>Debits</h3><p>Open the menu and choose Debits to record money you pay out: to a fellow employee, to someone else, or an expense. Each one has an amount, remarks and a date.</p>'+
+  '<h3>Debits, credits and people</h3><p>On the Payments tab, tap New entry and choose Fee payment, Debit or Credit. A debit is money going out: choose Expense, or Pay someone and give their name. A credit is money you receive from a person. Every person has their own ledger of what you paid and received, and you can open all of them from the menu under Ledger. Expenses are debits only.</p>'+
   '<h3>Customize the home screen</h3><p>Open Settings and choose Customize home screen, then tick what to show. The bell icon always opens Alerts.</p>'+
   '<h3>Absent message</h3><p>After saving attendance, tap the chat icon beside an absent student to message their parent on WhatsApp.</p>'+
   '<h3>How do I back up my data?</h3><ol><li>Open the menu and choose Backup &amp; Restore.</li><li>Tap Backup data.</li><li>Choose Save to this phone, or Share to send the file through WhatsApp, Drive or email.</li><li>Keep the file somewhere safe.</li></ol>'+
@@ -2610,7 +2724,9 @@ async function boot(){
     }
   }catch(e){console.error(e)}
   applyTheme();
-  try{matchMedia('(prefers-color-scheme:light)').addEventListener('change',()=>{if(state.theme==='system')applyTheme()})}catch(e){}
+  let _wasSmall=smallScreen();
+addEventListener('resize',()=>{const sm=smallScreen();if(sm!==_wasSmall){_wasSmall=sm;render(true)}});
+try{matchMedia('(prefers-color-scheme:light)').addEventListener('change',()=>{if(state.theme==='system')applyTheme()})}catch(e){}
   $('#tabs').innerHTML=TAB_DEF.map(t=>'<button data-a="tab" data-t="'+t[0]+'">'+ic(t[1])+'<span>'+t[2]+'</span></button>').join('');
   initHistory();
   document.addEventListener('visibilitychange',()=>{if(document.hidden)flush()});
