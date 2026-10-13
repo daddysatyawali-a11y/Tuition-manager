@@ -85,7 +85,7 @@ svg.i{width:1.25rem;height:1.25rem;fill:none;stroke:currentColor;stroke-width:1.
 /* ---------- drawer ---------- */
 #drawer{position:fixed;inset:0;z-index:40;pointer-events:none}
 #drawer .dscrim{position:absolute;inset:0;background:rgba(5,8,14,.6);opacity:0;transition:opacity .22s}
-#drawer .dpanel{position:absolute;left:0;top:0;bottom:0;width:min(20rem,86vw);background:var(--s1);border-right:1px solid var(--line);transform:translateX(-102%);transition:transform .25s ease;display:flex;flex-direction:column;overflow:auto;padding-bottom:env(safe-area-inset-bottom)}
+#drawer .dpanel{position:absolute;left:0;top:0;bottom:0;width:min(20rem,86vw);background:var(--s1);border-right:1px solid var(--line);transform:translateX(-102%);transition:transform .34s cubic-bezier(.22,1,.36,1);display:flex;flex-direction:column;overflow:auto;padding-bottom:env(safe-area-inset-bottom)}
 #drawer.open{pointer-events:auto}
 #drawer.open .dscrim{opacity:1}
 #drawer.open .dpanel{transform:none}
@@ -174,7 +174,7 @@ body.page .fab{bottom:calc(1.2rem + env(safe-area-inset-bottom))}
 #ov .ov{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-end;justify-content:center}
 #ov .scrim{position:absolute;inset:0;background:rgba(5,8,14,.62);opacity:0;transition:opacity .2s}
 #ov .ov.in .scrim{opacity:1}
-#ov .sheet{position:relative;width:100%;max-width:34rem;max-height:90dvh;overflow:auto;background:var(--s1);border:1px solid var(--line);border-radius:24px 24px 0 0;padding:1.2rem 1.1rem calc(1.1rem + env(safe-area-inset-bottom));transform:translateY(28px);opacity:0;transition:transform .22s,opacity .2s;box-shadow:var(--shadow)}
+#ov .sheet{position:relative;width:100%;max-width:34rem;max-height:90dvh;overflow:auto;background:var(--s1);border:1px solid var(--line);border-radius:24px 24px 0 0;padding:1.2rem 1.1rem calc(1.1rem + env(safe-area-inset-bottom));transform:translateY(40px) scale(.985);opacity:0;transition:transform .36s cubic-bezier(.22,1,.36,1),opacity .22s;box-shadow:var(--shadow)}
 #ov .ov.in .sheet{transform:none;opacity:1}
 #ov .ov.center{align-items:center}
 #ov .ov.center .sheet{border-radius:22px;max-width:26rem;margin:1rem;width:calc(100% - 2rem)}
@@ -187,9 +187,9 @@ body.page .fab{bottom:calc(1.2rem + env(safe-area-inset-bottom))}
 .row-end{display:flex;justify-content:flex-end;gap:.6rem;margin-top:1rem}
 #toasts{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(5.6rem + env(safe-area-inset-bottom));z-index:90;display:flex;flex-direction:column;gap:.5rem;align-items:center;pointer-events:none;width:max-content;max-width:92vw}
 body.page #toasts{bottom:calc(1.6rem + env(safe-area-inset-bottom))}
-.toast{background:var(--s3);color:var(--tx);border:1px solid var(--line);padding:.65rem 1rem;border-radius:12px;box-shadow:var(--shadow);animation:pop .22s;font-size:.92rem;transition:opacity .3s}
+.toast{background:var(--s3);color:var(--tx);border:1px solid var(--line);padding:.65rem 1rem;border-radius:12px;box-shadow:var(--shadow);animation:toastIn .38s cubic-bezier(.34,1.56,.64,1);font-size:.92rem;transition:opacity .3s,transform .3s}
 .toast.err{background:color-mix(in srgb,var(--bad) 22%,var(--s1));border-color:color-mix(in srgb,var(--bad) 55%,var(--line))}
-.toast.out{opacity:0}
+.toast.out{opacity:0;transform:translateY(8px) scale(.96)}
 @keyframes pop{from{transform:translateY(8px);opacity:0}}
 
 /* ---------- home ---------- */
@@ -294,7 +294,7 @@ body.page #toasts{bottom:calc(1.6rem + env(safe-area-inset-bottom))}
 .trow .who span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .trow>span:nth-child(2){color:var(--tx2);text-align:right}
 .trow>span:last-child{text-align:right;font-weight:700}
-.tog{min-width:6.6rem;padding:.45rem .8rem;border-radius:10px;border:1px solid var(--line);background:var(--s2);font-weight:600;font-size:.86rem;text-align:center}
+.tog{min-width:3.9rem;padding:.45rem .55rem;border-radius:10px;border:1px solid var(--line);background:var(--s2);font-weight:600;font-size:.86rem;text-align:center}
 .tog.on{background:color-mix(in srgb,var(--bad) 18%,transparent);color:var(--bad);border-color:color-mix(in srgb,var(--bad) 45%,transparent)}
 .mk{width:5.2rem;text-align:right;min-height:2.4rem;padding:.4rem .6rem}
 .receipt-ok{display:grid;place-items:center;width:4.4rem;height:4.4rem;margin:.6rem auto;border-radius:50%;background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good);animation:pop .4s}
@@ -326,7 +326,7 @@ body.page #toasts{bottom:calc(1.6rem + env(safe-area-inset-bottom))}
 .tbl th{font-size:.78rem;color:var(--tx2);text-align:left;font-weight:600;padding:0 .3rem .1rem}
 .tbl td{padding:0 .3rem 0 0}
 .tbl td .inp{min-width:6rem}
-.attrow{display:flex;align-items:center;gap:.8rem;padding:.65rem 1rem;border-bottom:1px solid var(--line)}
+.attrow{display:flex;align-items:center;gap:.55rem;padding:.65rem .8rem;border-bottom:1px solid var(--line)}
 .attrow:last-child{border-bottom:0}
 .notice{display:flex;gap:.7rem;align-items:flex-start;padding:.9rem 1rem;border-radius:16px;background:color-mix(in srgb,var(--warn) 14%,var(--s1));border:1px solid color-mix(in srgb,var(--warn) 40%,var(--line))}
 .notice svg{color:var(--warn);margin-top:.1rem}
@@ -381,6 +381,72 @@ h1,h2,h3{letter-spacing:-.02em}
   .fab{bottom:calc(6.4rem + env(safe-area-inset-bottom))}
   #toasts{bottom:calc(6.6rem + env(safe-area-inset-bottom))}
 }
+
+/* ---- layout fixes: labels stay inside their shapes ---- */
+.qa button{height:auto;min-height:3.1rem;padding:.4rem .85rem .4rem .5rem;white-space:normal;line-height:1.15;font-size:.86rem;overflow-wrap:anywhere}
+.qa button .qi{align-self:center}
+.ch-head>div:first-child{min-width:0;flex:1}
+.mom{border-radius:14px;line-height:1.25;padding:.35rem .8rem .35rem .6rem}
+.mom svg{flex:none}
+.grow>b,.grow>small{white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow-wrap:anywhere}
+.crow{gap:.25rem;padding-left:.5rem;padding-right:.5rem}
+.crow .ib{width:2.2rem;height:2.2rem}
+.crow .grow{padding:0 .3rem}
+.stat small{line-height:1.25}
+.chip,.pill{flex-shrink:0}
+
+/* ---------- motion ---------- */
+.attbtns{display:flex;gap:.35rem;flex:none}
+.attrow .grow>b{white-space:normal}
+.tog{transition:background-color .18s,color .18s,border-color .18s,transform .16s}
+.tog.late.on{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn);border-color:color-mix(in srgb,var(--warn) 45%,transparent)}
+.tog.pulse,.pill.bump{animation:tPop .34s cubic-bezier(.34,1.56,.64,1)}
+.attrow{transition:background-color .25s}
+.attrow.is-absent{background:color-mix(in srgb,var(--bad) 8%,transparent)}
+.attrow.is-late{background:color-mix(in srgb,var(--warn) 9%,transparent)}
+@keyframes tPop{0%{transform:scale(.86)}60%{transform:scale(1.09)}100%{transform:none}}
+@keyframes toastIn{from{transform:translateY(16px) scale(.92);opacity:0}}
+@keyframes rise{from{opacity:0;transform:translateY(12px)}}
+@keyframes fadeIn{from{opacity:0}}
+button{transition:transform .16s cubic-bezier(.2,.8,.2,1),background-color .18s,color .18s,border-color .18s,box-shadow .18s,filter .18s}
+button:active:not(:disabled){transform:scale(.95)}
+button.row:active,button.rowmain:active{transform:scale(.988)}
+.ib:active:not(:disabled){transform:scale(.86)}
+#tabs button:active{transform:scale(.9)}
+#tabs button svg{transition:transform .25s cubic-bezier(.34,1.56,.64,1)}
+#tabs button.on svg{animation:tabPop .45s cubic-bezier(.34,1.56,.64,1)}
+@keyframes tabPop{0%{transform:scale(.7) translateY(3px)}60%{transform:scale(1.18)}100%{transform:none}}
+.inp{transition:border-color .18s,box-shadow .18s}
+#main{overflow-x:clip}
+#view.pg-fwd{animation:pgFwd .36s cubic-bezier(.22,1,.36,1)}
+#view.pg-back{animation:pgBack .32s cubic-bezier(.22,1,.36,1)}
+#view.pg-tab{animation:pgTab .3s ease-out}
+@keyframes pgFwd{from{opacity:0;transform:translateX(28px)}}
+@keyframes pgBack{from{opacity:0;transform:translateX(-24px)}}
+@keyframes pgTab{from{opacity:0;transform:translateY(10px)}}
+#bar.pg-in h1{animation:fadeIn .32s ease-out}
+#view.pg-in :is(.list,.qa,.glance,.tiles,.stats3,.home)>:nth-child(-n+9),#view.pg-in .card{animation:rise .45s cubic-bezier(.22,1,.36,1) backwards}
+#view.pg-in :is(.list,.qa,.glance,.tiles,.stats3,.home)>:nth-child(2){animation-delay:.04s}
+#view.pg-in :is(.list,.qa,.glance,.tiles,.stats3,.home)>:nth-child(3){animation-delay:.08s}
+#view.pg-in :is(.list,.qa,.glance,.tiles,.stats3,.home)>:nth-child(4){animation-delay:.12s}
+#view.pg-in :is(.list,.qa,.glance,.tiles,.stats3,.home)>:nth-child(5){animation-delay:.16s}
+#view.pg-in :is(.list,.qa,.glance,.tiles,.stats3,.home)>:nth-child(6){animation-delay:.2s}
+#view.pg-in :is(.list,.qa,.glance,.tiles,.stats3,.home)>:nth-child(7){animation-delay:.24s}
+#view.pg-in :is(.list,.qa,.glance,.tiles,.stats3,.home)>:nth-child(8){animation-delay:.28s}
+#view.pg-in :is(.list,.qa,.glance,.tiles,.stats3,.home)>:nth-child(9){animation-delay:.32s}
+#drawer.open .dhead{animation:fadeIn .4s .05s backwards}
+#drawer.open .dnav>*{animation:rise .42s cubic-bezier(.22,1,.36,1) backwards}
+#drawer.open .dnav>:nth-child(1){animation-delay:.06s}
+#drawer.open .dnav>:nth-child(2){animation-delay:.09s}
+#drawer.open .dnav>:nth-child(3){animation-delay:.12s}
+#drawer.open .dnav>:nth-child(4){animation-delay:.15s}
+#drawer.open .dnav>:nth-child(5){animation-delay:.18s}
+#drawer.open .dnav>:nth-child(6){animation-delay:.21s}
+#drawer.open .dnav>:nth-child(7){animation-delay:.24s}
+#drawer.open .dnav>:nth-child(n+8){animation-delay:.27s}
+#ov .ov:not(.in) .sheet{transition-duration:.2s,.2s;transition-timing-function:ease-in}
+#ov .ov.center .sheet{transform:scale(.92) translateY(8px)}
+#ov .ov.center.in .sheet{transform:none}
 </style>
 </head>
 <body>
@@ -615,7 +681,7 @@ const store={
 
 /* ---------- state ---------- */
 function defState(){return{
-  setupDone:false,loggedOut:false,theme:'dark',accentHue:72,appFont:'urbanist',look:2,sfx:true,dueDay:10,homeHide:{qaDebit:true},classFees:{},debits:[],people:[],ledger:[],listView:'list',
+  setupDone:false,loggedOut:false,theme:'dark',accentHue:72,appFont:'urbanist',look:2,sfx:true,dueDay:10,homeHide:{},classFees:{},listView:'list',
   teacher:'',brand:'',gender:'male',teacherWhatsapp:'',teacherInstagram:'',teacherYoutube:'',teacherEmail:'',teacherAddress:'',teacherNote:'',
   qrCodeDataUrl:'',upiId:'',sessionStart:'',sessionEnd:'',
   classes:[],activeClass:'All',retiredClasses:[],classColors:{},classGroupLinks:{},
@@ -625,7 +691,7 @@ function defState(){return{
 let state=defState();
 function normalizeState(st){
   const d=defState(),o=Object.assign(d,st||{});
-  ['classes','students','leftStudentTransactions','tests','retiredClasses','paymentModes','debits','people','ledger'].forEach(k=>{if(!Array.isArray(o[k]))o[k]=d[k]});
+  ['classes','students','leftStudentTransactions','tests','retiredClasses','paymentModes'].forEach(k=>{if(!Array.isArray(o[k]))o[k]=d[k]});
   ['classColors','classGroupLinks','notifDismissed','classFees','homeHide'].forEach(k=>{if(!o[k]||typeof o[k]!=='object')o[k]={}});
   o.students.forEach(s=>{if(!Array.isArray(s.contacts)||!s.contacts.length)s.contacts=[''];if(!s.transactions)s.transactions=[];if(!s.memberships)s.memberships=[]});
   o.leftStudentTransactions.forEach(a=>{if(!a.transactions)a.transactions=[]});
@@ -635,11 +701,7 @@ function normalizeState(st){
   if(o.look!==2){o.look=2;if(o.appFont==='system')o.appFont='urbanist';if(o.accentHue===210)o.accentHue=72}   // one-time move to the Night look
   delete o.textScale;
   if(o.homeHide&&o.homeHide.expected)delete o.homeHide.expected;
-  if(o.debits.length){   // older debit entries move into the new ledger
-    const named={},pid=n=>{if(!named[n]){named[n]={id:uid(),name:n};o.people.push(named[n])}return named[n].id};
-    o.debits.forEach(d=>o.ledger.push({id:d.id||uid(),date:d.date,amount:+d.amount||0,kind:d.type==='expense'?'expense':'pay',personId:d.type==='expense'?'':pid(d.type==='staff'?'Fellow employee':'Someone else'),remark:d.remark||''}));
-    o.debits=[];
-  }
+  delete o.debits;delete o.people;delete o.ledger;   // purge old ledger data so it is not saved again
   if(!(o.dueDay>=1&&o.dueDay<=28))o.dueDay=10;
   o.students.forEach(s=>{if(!Array.isArray(s.plan))s.plan=[];s.free=!!s.free});
   return o;
@@ -862,7 +924,7 @@ function openSheet(html,mount,center){
 function closeOverlay(w){
   w=w||overlays[overlays.length-1];if(!w)return;
   overlays=overlays.filter(x=>x!==w);w.classList.remove('in');
-  setTimeout(()=>w.remove(),220);
+  setTimeout(()=>w.remove(),240);
   if(w._onclose)w._onclose();
 }
 function closeAllOverlays(){while(overlays.length)closeOverlay()}
@@ -936,24 +998,32 @@ const cnt=(n,money)=>'<span class="num" data-count="'+(+n||0)+'"'+(money?' data-
 let tab='home',stack=[],tabScroll={},rtok=0;
 const TABS={},PAGES={};
 const TAB_DEF=[['home','home','Home'],['students','users','Students'],['payments','card','Payments'],['tests','file','Tests']];
-const DRAWER_DEF=[['attendance','clip','Attendance'],['classes','layers','Classes'],['ledger','card','Ledger'],['reports','bars','Reports'],['export','down','Export to Excel'],['backup','cloud','Backup & Restore'],['settings','sliders','Settings'],['about','info','About & Help']];
+const DRAWER_DEF=[['attendance','clip','Attendance'],['classes','layers','Classes'],['reports','bars','Reports'],['export','down','Export to Excel'],['backup','cloud','Backup & Restore'],['settings','sliders','Settings'],['about','info','About & Help']];
 const navKey=()=>stack.length?stack[stack.length-1].nav:tab;
 
+let navDir=null,pgT=0;
+function pageAnim(dir){
+  const v=$('#view'),b=$('#bar'),all=['pg-in','pg-fwd','pg-back','pg-tab'];
+  v.classList.remove(...all);b.classList.remove('pg-in');
+  if(!dir)return;
+  void v.offsetWidth;v.classList.add('pg-in','pg-'+dir);b.classList.add('pg-in');
+  clearTimeout(pgT);pgT=setTimeout(()=>{v.classList.remove(...all);b.classList.remove('pg-in')},800);
+}
 function go(p,a={},opts={}){
   const top=stack[stack.length-1];
   if(top)top.scroll=window.scrollY;else tabScroll[tab]=window.scrollY;
   stack.push({p,a,nav:opts.nav||(top?top.nav:tab)});
-  render();
+  navDir='fwd';render();
 }
 function replace(p,a={}){
   const top=stack[stack.length-1];
   stack[stack.length-1]={p,a,nav:top?top.nav:tab};render();
 }
-function back(){if(!stack.length)return false;stack.pop();render(true);return true}
+function back(){if(!stack.length)return false;stack.pop();navDir='back';render(true);return true}
 function setTab(t){
   const same=!stack.length&&tab===t;closeAllOverlays();closeDrawer();
   if(!same)tabScroll[tab]=window.scrollY;
-  stack=[];tab=t;render(false);
+  stack=[];tab=t;if(!same)navDir='tab';render(false);
   if(same)window.scrollTo(0,0);
 }
 function openPage(p,a){closeDrawer();closeAllOverlays();stack=[];go(p,a||{},{nav:p})}
@@ -965,10 +1035,11 @@ async function render(restore){
   try{def=top?await PAGES[top.p](top.a||{}):await TABS[tab]()}
   catch(e){console.error(e);def={title:'Something went wrong',html:'<div class="wrap"><div class="empty">'+ic('alert')+'<b>This screen could not load.</b><small>'+esc(e.message||e)+'</small><button class="btn" data-a="back">Go back</button></div></div>'}}
   if(tok!==rtok)return;
+  const dir=navDir;navDir=null;
   document.body.classList.toggle('page',!!top);
   const left=top?'<button class="ib" data-a="back" aria-label="Back">'+ic('chevL')+'</button>':'<button class="ib" data-a="openDrawer" aria-label="Open menu">'+ic('menu')+'</button>';
   $('#bar').innerHTML=left+'<h1>'+esc(def.title||'')+'</h1>'+(def.actions||'');
-  $('#view').innerHTML=def.html;
+  $('#view').innerHTML=def.html;pageAnim(dir);
   $$('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===navKey()));
   renderBanner();
   if(def.after)def.after();
@@ -1173,7 +1244,7 @@ TABS.home=function(){
   const act=state.students.filter(isActive).length;
   const wk=(()=>{const d=new Date();d.setDate(d.getDate()-6);const lim=dstr(d);return state.tests.filter(t=>t.date>=lim&&t.date<=today()).length})();
   if(!on('search'))Q.home='';
-  const qa=[['qaStudent','users','Add student'],['qaPay','card','Record payment'],['qaTest','file','Add test record'],['qaAtt','clip','Mark attendance'],['qaDebit','card','Add debit']].filter(a=>on(a[0]));
+  const qa=[['qaStudent','users','Add student'],['qaPay','card','Record payment'],['qaTest','file','Add test record'],['qaAtt','clip','Mark attendance']].filter(a=>on(a[0]));
   const tiles=[['tStudents','tileStudents','users',cnt(act),'Active students',0],['tTests','tileTests','file',cnt(wk),'Tests this week',0],['tAlerts','bell','bell',cnt(nf),'Alerts',nf],['tClasses','tileClasses','layers',cnt(state.classes.length),'Active classes',0]].filter(t=>on(t[0]));
   const needSetup=!state.classes.length||!state.sessionStart||!state.sessionEnd;
   const sq=on('quote'),sf=on('feesCard'),both=sq&&sf,showG=on('greeting'),showS=on('search');
@@ -1202,7 +1273,7 @@ TABS.home=function(){
 /* ---- Settings > Customize home screen: plain checkboxes, order stays the same ---- */
 const HOME_ITEMS=[
   ['Sections',[['greeting','Greeting'],['search','Search bar'],['quote','Quote of the day'],['feesCard','Fees collected'],['overdue','Overdue fees'],['activity','Recent activity']]],
-  ['Quick buttons',[['qaStudent','Add student'],['qaPay','Record payment'],['qaTest','Add test record'],['qaAtt','Mark attendance'],['qaDebit','Add debit']]],
+  ['Quick buttons',[['qaStudent','Add student'],['qaPay','Record payment'],['qaTest','Add test record'],['qaAtt','Mark attendance']]],
   ['Stat tiles',[['tStudents','Active students'],['tTests','Tests this week'],['tAlerts','Alerts'],['tClasses','Active classes']]]
 ];
 PAGES.homeCustomize=function(){
@@ -1212,7 +1283,7 @@ PAGES.homeCustomize=function(){
 };
 INP.homeToggle=el=>{if(!state.homeHide)state.homeHide={};if(el.checked)delete state.homeHide[el.value];else state.homeHide[el.value]=true;save()};
 ACT.homeCustom=()=>go('homeCustomize');
-ACT.homeReset=()=>{state.homeHide={qaDebit:true};save();toast('Home screen reset');render(true)};
+ACT.homeReset=()=>{state.homeHide={};save();toast('Home screen reset');render(true)};
 ACT.bell=()=>go('notifications',{},{nav:'home'});
 ACT.tileStudents=()=>setTab('students');
 ACT.tileTests=()=>setTab('tests');
@@ -1392,7 +1463,7 @@ ACT.delStu=async el=>{
   const s=byId(el.dataset.id);if(!s)return;
   if(s.transactions.length){
     const c=await chooseSheet('Delete '+s.name+'?',[
-      {v:'keep',label:'Delete student, keep payment history',sub:'Payments stay in the ledger and exports, marked as Left',icon:'archive'},
+      {v:'keep',label:'Delete student, keep payment history',sub:'Payments stay in your payment history and exports, marked as Left',icon:'archive'},
       {v:'all',label:'Delete everything permanently',sub:'The student and all their payments are removed',icon:'trash',danger:true}],
       'This student has '+s.transactions.length+' recorded payment'+(s.transactions.length>1?'s':'')+'.');
     if(!c)return;
@@ -1577,7 +1648,6 @@ let payDraw=null;
 TABS.payments=function(){
   const total=totalReceived(),avg=total/sessionMonthsElapsed();
   const remaining=state.students.filter(isActive).reduce((a,s)=>a+balOf(s),0);
-  if(!Q.payFilter)Q.payFilter='all';
   return{
     title:'Payments',
     actions:'<button class="ib" data-a="exportXlsx" aria-label="Export to Excel">'+ic('down')+'</button>',
@@ -1586,25 +1656,18 @@ TABS.payments=function(){
       '<div class="stat"><small>Average / month</small><b>'+cnt(avg,true)+'</b></div>'+
       '<div class="stat"><small>Fees remaining</small><b class="bal '+(remaining?'':'zero')+'">'+cnt(remaining,true)+'</b></div></div>'+
       '<div class="searchbar">'+ic('search')+'<input id="q" type="search" placeholder="Search payments" autocomplete="off" value="'+esc(Q.payments)+'"></div>'+
-      '<div class="seg" style="margin:.8rem 0 .2rem">'+[['all','All'],['fees','Fees'],['debits','Debits'],['credits','Credits']].map(t=>'<label><input type="radio" name="pf" value="'+t[0]+'" data-ch="payFilter" '+(Q.payFilter===t[0]?'checked':'')+'><span>'+t[1]+'</span></label>').join('')+'</div>'+
-      '<div id="list"></div></div><button class="fab" data-a="payNew">'+ic('plus')+'New entry</button>',
+      '<div id="list"></div></div><button class="fab" data-a="payNew">'+ic('plus')+'New payment</button>',
     after(){
       const draw=()=>{
-        const q=norm(Q.payments),f=Q.payFilter||'all',items=[];
-        if(f==='all'||f==='fees')allTx().forEach(x=>{
+        const q=norm(Q.payments),items=[];
+        allTx().forEach(x=>{
           if(!q||[nm(x.owner),x.label,x.t.remark,x.t.mode,String(x.t.amount),fmtDate(x.t.date),x.t.date].some(v=>norm(v).includes(q)))items.push({d:String(x.t.date),x});
         });
-        if(f!=='fees')state.ledger.forEach(e=>{
-          if(f==='debits'&&e.kind==='receive')return;if(f==='credits'&&e.kind!=='receive')return;
-          if(q&&![entryTitle(e),e.remark,entryKind(e),String(e.amount),fmtDate(e.date),e.date].some(v=>norm(v).includes(q)))return;
-          items.push({d:String(e.date),e});
-        });
         items.sort((a,b)=>b.d.localeCompare(a.d));
-        if(!items.length){$('#list').innerHTML='<div class="empty">'+ic('card')+'<b>'+(q?'Nothing matches':'Nothing here yet')+'</b><small>'+(q?'Try a different search.':'Tap New entry to record a fee, a debit or a credit.')+'</small></div>';return}
+        if(!items.length){$('#list').innerHTML='<div class="empty">'+ic('card')+'<b>'+(q?'Nothing matches':'Nothing here yet')+'</b><small>'+(q?'Try a different search.':'Tap New payment to record one.')+'</small></div>';return}
         let h='',cur='';
         for(const it of items){
           if(it.d!==cur){if(cur)h+='</div>';cur=it.d;h+='<div class="day">'+esc(friendlyDay(it.d))+'</div><div class="list">'}
-          if(it.e){h+='<div class="row">'+entryRow(it.e).replace('<button class="row"','<button class="rowmain"')+'</div>';continue}
           const x=it.x,stu=x.left?null:x.owner;
           h+='<div class="row"><button class="rowmain" data-a="payOpen" data-id="'+x.t.id+'">'+avatar(nm(x.owner),stu?stuColor(stu):'')+'<span class="grow"><b>'+esc(nm(x.owner))+(x.left?' <span class="pill warn">Left</span>':'')+'</b><small>'+esc(x.label)+(x.t.mode||x.t.remark?' · '+esc(x.t.mode||x.t.remark):'')+'</small></span><span class="end"><b class="num">'+inr(x.t.amount)+'</b></span></button><button class="ib" data-a="payEdit" data-id="'+x.t.id+'" aria-label="Edit payment">'+ic('edit')+'</button></div>';
         }
@@ -1614,14 +1677,12 @@ TABS.payments=function(){
     }
   };
 };
-INP.payFilter=el=>{Q.payFilter=el.value;if(payDraw)payDraw()};
 ACT.payEdit=el=>go('payForm',{tid:el.dataset.id});
 
 /* --- export to Excel: choose what goes in the workbook --- */
 const EXPORT_OPTS=[
   ['students','Student details','Name, class, contacts, parents, fee type, status'],
   ['payments','Payments and transactions','Every payment with date, mode and remark'],
-  ['ledger','Debits, credits and people','Expenses, payments to people, money received, and each person\'s totals'],
   ['fees','Fee details','Fee, paid and balance for each student, plus installment plans'],
   ['attendance','Attendance','Month-wise present and absent summary per student'],
   ['tests','Test history','Marks of every student, plus a summary for each test']
@@ -1634,7 +1695,7 @@ PAGES.export=function(){
     '<p class="muted">Choose what to include. Each choice becomes its own sheet in one Excel file.</p>'+
     '<div class="list">'+EXPORT_OPTS.map(o=>'<label class="row" style="cursor:pointer"><input type="checkbox" class="exp-cb" value="'+o[0]+'" data-ch="expPick" checked style="width:1.25rem;height:1.25rem;accent-color:var(--ac);flex:none"><span class="grow" style="white-space:normal"><b>'+o[1]+'</b><small style="white-space:normal">'+o[2]+'</small></span></label>').join('')+'</div>'+
     '<button class="btn sm" style="align-self:flex-start" data-a="expAll" id="expAllBtn">Clear all</button>'+
-    '<div class="fgroup"><h4>Date range</h4><div class="two stack"><label class="f">From<input class="inp" type="date" id="x_from" value="'+from0+'"></label><label class="f">To<input class="inp" type="date" id="x_to" value="'+today()+'"></label></div><small>Applies to payments, debits and credits, attendance (by month) and tests. Student and fee details are always a full snapshot.</small></div>'+
+    '<div class="fgroup"><h4>Date range</h4><div class="two stack"><label class="f">From<input class="inp" type="date" id="x_from" value="'+from0+'"></label><label class="f">To<input class="inp" type="date" id="x_to" value="'+today()+'"></label></div><small>Applies to payments, attendance (by month) and tests. Student and fee details are always a full snapshot.</small></div>'+
     '<div class="savebar"><button class="btn primary big" data-a="expRun" id="expRun">'+ic('down')+'Export</button></div></div></div>'};
 };
 function expSync(){
@@ -1668,14 +1729,14 @@ async function buildExportSheets(sel,from,to){
     if(ins.length>1)sheets.push({name:'Installments',rows:ins});
   }
   if(sel.has('attendance')){
-    const rows=[['Student','Class','Month','Working days','Present','Absent','Attendance %','Absent on (dates)']],m0=from.slice(0,7),m1=to.slice(0,7);
+    const rows=[['Student','Class','Month','Working days','Present','Absent','Late','Attendance %','Absent on (dates)']],m0=from.slice(0,7),m1=to.slice(0,7);
     for(const k of (await store.keys('att:')).sort()){
       const m=k.slice(4,11),c=k.slice(12);if(m<m0||m>m1)continue;
       const rec=await store.getJ(k);if(!rec||typeof rec!=='object')continue;
       if(!Array.isArray(rec.holidays))rec.holidays=[];if(!rec.records)rec.records={};
       state.students.filter(x=>memOf(x,c)&&(x.addedDate||'').slice(0,7)<=m&&(!x.leftDate||x.leftDate.slice(0,7)>=m)).sort(byName).forEach(x=>{
         const st=attStats(rec,m,x);if(!st.total)return;
-        rows.push([x.name+(x.leftDate?' (Left)':''),c,mLabel(m),st.total,st.present,st.absent.length,st.pct==null?'':st.pct,st.absent.map(d=>+d.slice(8)).join(', ')]);
+        rows.push([x.name+(x.leftDate?' (Left)':''),c,mLabel(m),st.total,st.present,st.absent.length,st.late.length,st.pct==null?'':st.pct,st.absent.map(d=>+d.slice(8)).join(', ')]);
       });
     }
     sheets.push({name:'Attendance',rows});
@@ -1690,17 +1751,6 @@ async function buildExportSheets(sel,from,to){
       sum.push([t.date,t.name,t.class,t.subject||'',t.maxMarks,st?st.n:0,l.length-(st?st.n:0),st?Math.round(st.avg*100)/100:'',st?Math.round(st.pct*10)/10:'']);
     });
     sheets.push({name:'Test history',rows});sheets.push({name:'Test summary',rows:sum});
-  }
-  if(sel.has('ledger')){
-    const l=state.ledger.filter(e=>inR(e.date)).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
-    const rows=[['Date','Type','Person','Remarks','Debit (₹)','Credit (₹)']];let dt=0,ct=0;
-    l.forEach(e=>{const cr=e.kind==='receive';if(cr)ct+=+e.amount||0;else dt+=+e.amount||0;
-      rows.push([String(e.date),e.kind==='expense'?'Expense':cr?'Credit (received)':'Debit (paid)',e.kind==='expense'?'':entryTitle(e),e.remark||'',cr?'':(+e.amount||0),cr?(+e.amount||0):''])});
-    rows.push(['Total','','','',r2(dt),r2(ct)]);
-    sheets.push({name:'Debits and credits',rows,bold:[rows.length-1]});
-    const pr=[['Person','Paid (₹)','Received (₹)','Net paid (₹)']];
-    state.people.slice().sort((a,b)=>coll.compare(a.name,b.name)).forEach(p=>{const t=personTotals(p.id,l);pr.push([p.name,t.paid,t.got,t.net])});
-    sheets.push({name:'People ledger',rows:pr});
   }
   return sheets;
 }
@@ -2139,7 +2189,8 @@ function attStats(rec,month,s){
   for(let d=1;d<=dim;d++){const dt=month+'-'+pad(d);if(dt>t)break;if(rec.holidays.includes(dt))hol++;else work.push(dt)}
   const mine=s?work.filter(d=>d>=(s.addedDate||'')):work;
   const ab=s?mine.filter(d=>rec.records[d]&&rec.records[d][s.id]==='absent'):[];
-  return{work,hol,total:mine.length,absent:ab,present:mine.length-ab.length,pct:mine.length?Math.round((mine.length-ab.length)/mine.length*100):null};
+  const lt=s?mine.filter(d=>rec.records[d]&&rec.records[d][s.id]==='late'):[];   // late counts as present
+  return{work,hol,total:mine.length,absent:ab,late:lt,present:mine.length-ab.length,pct:mine.length?Math.round((mine.length-ab.length)/mine.length*100):null};
 }
 PAGES.attendance=function(a){
   const cls0=(a&&a.cls)||(state.activeClass!=='All'?state.activeClass:sortedClasses()[0]);
@@ -2153,13 +2204,25 @@ async function attLoad(cls,date){
   const tok=++attTok,month=date.slice(0,7);
   const rec=clone(await getAtt(cls,month));
   if(tok!==attTok)return;
-  AT={cls,date,month,rec,absent:new Set(Object.keys(rec.records[date]||{}))};
+  AT={cls,date,month,rec,marks:new Map(Object.entries(rec.records[date]||{}).filter(e=>e[1]==='absent'||e[1]==='late'))};
   drawAtt();
 }
-function attCounts(){
-  const n=rosterOf(AT.cls).length,a=[...AT.absent].filter(id=>byId(id)).length;
-  return (n-a)+' present, '+a+' absent';
+function attTally(){
+  const r=rosterOf(AT.cls);let a=0,l=0;
+  r.forEach(s=>{const m=AT.marks.get(s.id);if(m==='absent')a++;else if(m==='late')l++});
+  return{p:r.length-a-l,a,l};
 }
+function attCounts(){const t=attTally();return t.p+' present · '+t.l+' late · '+t.a+' absent'}
+/* text for the parents' class group; absent names are bold (*name* in WhatsApp) */
+function attMessage(){
+  const {cls,date}=AT,P=[],A=[],L=[];
+  rosterOf(cls).forEach(s=>{const m=AT.marks.get(s.id);(m==='absent'?A:m==='late'?L:P).push(s.name)});
+  const list=(arr,bold)=>arr.length?arr.map((n,i)=>(i+1)+'. '+(bold?'*'+n+'*':n)).join('\n'):'None';
+  const sign=[state.teacher,state.brand].filter(Boolean).join(', ');
+  return '*'+(date===today()?'Today’s attendance':'Attendance')+'*\n'+cls+' · '+WD[pd(date).getDay()]+', '+fmtDate(date)+
+    '\n\nPresent ('+P.length+')\n'+list(P)+'\n\nAbsent ('+A.length+')\n'+list(A,true)+'\n\nLate ('+L.length+')\n'+list(L)+(sign?'\n\n'+sign:'');
+}
+function attCommit(){const c=AT;c.rec.records[c.date]={};c.marks.forEach((v,id)=>{c.rec.records[c.date][id]=v})}
 function drawAtt(){
   const box=$('#attBody');if(!box||!AT)return;
   const {cls,date,month,rec}=AT,hol=rec.holidays.includes(date),saved=!!rec.records[date];
@@ -2169,15 +2232,19 @@ function drawAtt(){
     box.innerHTML='<div class="notice">'+ic('info')+'<div><b>Tuition off on '+fmtDate(date)+'</b><br><small>This day does not count as a working day for '+esc(cls)+'.</small></div></div><div class="btns" style="margin-top:.9rem"><button class="btn primary" data-a="attResume">Resume tuition</button><button class="btn danger" data-a="attRedo">Redo day</button></div>'+summaryBtn;
     return;
   }
-  box.innerHTML=(roster.length?'<div class="sect" style="margin-top:0"><h2>'+esc(cls)+', '+esc(friendlyDay(date))+'</h2><span class="pill" id="attCount">'+attCounts()+'</span></div><div class="list">'+roster.map(s=>'<div class="attrow">'+avatar(s.name,stuColor(s),'sm')+'<span class="grow"><b>'+esc(s.name)+'</b></span><button class="tog '+(AT.absent.has(s.id)?'on':'')+'" data-a="attToggle" data-id="'+s.id+'">'+(AT.absent.has(s.id)?'Absent':'Mark absent')+'</button>'+(rec.records[date]&&rec.records[date][s.id]?'<button class="ib" data-a="attMsg" data-id="'+s.id+'" aria-label="Message parent">'+ic('chat')+'</button>':'')+'</div>').join('')+'</div>':'<div class="empty">'+ic('users')+'<b>No active students in '+esc(cls)+'</b><small>Everyone is present by default. Only absences are recorded.</small></div>')+
-    '<div class="savebar"><button class="btn primary big" data-a="attSave">Save attendance</button></div>'+
-    '<div class="btns"><button class="btn" data-a="attOff">Tuition off</button>'+((saved||AT.absent.size)?'<button class="btn danger" data-a="attRedo">Redo day</button>':'')+'</div>'+summaryBtn;
+  box.innerHTML=(roster.length?'<div class="sect" style="margin-top:0"><h2>'+esc(cls)+', '+esc(friendlyDay(date))+'</h2><span class="pill" id="attCount">'+attCounts()+'</span></div><div class="list">'+roster.map(s=>{const m=AT.marks.get(s.id)||'';return '<div class="attrow'+(m==='absent'?' is-absent':m==='late'?' is-late':'')+'">'+avatar(s.name,stuColor(s),'sm')+'<span class="grow"><b>'+esc(s.name)+'</b></span><div class="attbtns"><button class="tog late '+(m==='late'?'on':'')+'" data-a="attMark" data-m="late" data-id="'+s.id+'">Late</button><button class="tog '+(m==='absent'?'on':'')+'" data-a="attMark" data-m="absent" data-id="'+s.id+'">Absent</button></div>'+(rec.records[date]&&rec.records[date][s.id]==='absent'?'<button class="ib" data-a="attMsg" data-id="'+s.id+'" aria-label="Message parent">'+ic('chat')+'</button>':'')+'</div>'}).join('')+'</div>':'<div class="empty">'+ic('users')+'<b>No active students in '+esc(cls)+'</b><small>Everyone is present by default. Only late and absent are recorded.</small></div>')+
+    '<div class="savebar"><button class="btn primary big" data-a="attSave">Save attendance</button>'+(roster.length?'<button class="btn big" style="width:100%;margin-top:.55rem" data-a="attShare">'+ic('share')+'Share to class group</button>':'')+'</div>'+
+    '<div class="btns"><button class="btn" data-a="attOff">Tuition off</button>'+((saved||AT.marks.size)?'<button class="btn danger" data-a="attRedo">Redo day</button>':'')+'</div>'+summaryBtn;
 }
-ACT.attToggle=el=>{
-  const id=el.dataset.id;
-  if(AT.absent.has(id))AT.absent.delete(id);else AT.absent.add(id);
-  const on=AT.absent.has(id);el.classList.toggle('on',on);el.textContent=on?'Absent':'Mark absent';
-  $('#attCount').textContent=attCounts();
+ACT.attMark=el=>{
+  if(!AT)return;
+  const id=el.dataset.id,m=el.dataset.m;
+  if(AT.marks.get(id)===m)AT.marks.delete(id);else AT.marks.set(id,m);
+  const cur=AT.marks.get(id)||'',row=el.closest('.attrow');
+  $$('.tog',row).forEach(b=>b.classList.toggle('on',b.dataset.m===cur));
+  row.classList.toggle('is-absent',cur==='absent');row.classList.toggle('is-late',cur==='late');
+  el.classList.remove('pulse');void el.offsetWidth;el.classList.add('pulse');
+  const c=$('#attCount');c.textContent=attCounts();c.classList.remove('bump');void c.offsetWidth;c.classList.add('bump');
 };
 ACT.attMsg=async el=>{
   const s=byId(el.dataset.id);if(!s||!AT)return;
@@ -2185,12 +2252,18 @@ ACT.attMsg=async el=>{
   await deliverWA(s,msg);
 };
 ACT.attSave=async()=>{
-  const c=AT;c.rec.records[c.date]={};c.absent.forEach(id=>{c.rec.records[c.date][id]='absent'});
+  const c=AT;attCommit();
   await putAtt(c.cls,c.month,c.rec);toast('Attendance saved');drawAtt();
+};
+/* WhatsApp cannot be told to post into a group, so this opens the share sheet: pick the class group there */
+ACT.attShare=async()=>{
+  if(!AT)return;
+  const c=AT;attCommit();await putAtt(c.cls,c.month,c.rec);drawAtt();
+  await shareText(attMessage());
 };
 ACT.attOff=async()=>{
   const c=AT;if(!c.rec.holidays.includes(c.date))c.rec.holidays.push(c.date);
-  delete c.rec.records[c.date];c.absent.clear();
+  delete c.rec.records[c.date];c.marks.clear();
   await putAtt(c.cls,c.month,c.rec);toast('Marked as tuition off');drawAtt();
 };
 ACT.attResume=async()=>{
@@ -2199,8 +2272,8 @@ ACT.attResume=async()=>{
 };
 ACT.attRedo=async()=>{
   const c=AT;
-  if(!await confirmDlg('Redo '+fmtDate(c.date)+'?','This clears the absences and any tuition-off mark for '+esc(c.cls)+' on this day.','Redo day'))return;
-  delete c.rec.records[c.date];c.rec.holidays=c.rec.holidays.filter(d=>d!==c.date);c.absent.clear();
+  if(!await confirmDlg('Redo '+fmtDate(c.date)+'?','This clears the late and absent marks and any tuition-off mark for '+esc(c.cls)+' on this day.','Redo day'))return;
+  delete c.rec.records[c.date];c.rec.holidays=c.rec.holidays.filter(d=>d!==c.date);c.marks.clear();
   await putAtt(c.cls,c.month,c.rec);toast('Day cleared');drawAtt();
 };
 ACT.attSummaryGo=()=>go('attSummary',{cls:AT.cls,month:AT.month});
@@ -2226,7 +2299,7 @@ PAGES.studentAtt=async function({id,month}){
   for(const c of cls){
     const x=attStats(await getAtt(c,month),month,s);
     cards.push('<div class="card" style="margin-bottom:.7rem"><div class="ch-head"><h3>'+esc(c)+'</h3><span class="pill '+pctClass(x.pct)+'">'+(x.pct==null?'No days yet':x.pct+'%')+'</span></div><div class="bigamt num" style="text-align:left;font-size:1.8rem;margin:.4rem 0">'+x.present+' <small>of '+x.total+' days</small></div>'+
-      (x.absent.length?'<small>Absent on '+x.absent.map(d=>+d.slice(8)).join(', ')+' '+esc(mShort(month))+'</small>':'<small>'+(x.total?'No absences this month.':'Nothing recorded for this month.')+'</small>')+'</div>');
+      (x.absent.length?'<small>Absent on '+x.absent.map(d=>+d.slice(8)).join(', ')+' '+esc(mShort(month))+'</small>':'<small>'+(x.total?'No absences this month.':'Nothing recorded for this month.')+'</small>')+(x.late.length?'<small style="display:block;margin-top:.2rem">Late on '+x.late.map(d=>+d.slice(8)).join(', ')+' '+esc(mShort(month))+'</small>':'')+'</div>');
   }
   return{title:'Attendance',html:'<div class="wrap narrow"><div class="phead">'+avatar(s.name,stuColor(s),'lg')+'<h2>'+esc(s.name)+'</h2></div><label class="f" style="margin-bottom:1rem">Month<input class="inp" type="month" data-ch="stuAttMonth" data-id="'+s.id+'" value="'+month+'"></label>'+(cards.join('')||'<div class="empty"><b>No classes</b></div>')+'</div>'};
 };
@@ -2239,7 +2312,7 @@ const taken=(name,except)=>state.classes.concat(state.retiredClasses.map(r=>r.na
 PAGES.classes=function(){
   const l=sortedClasses(),act=state.students.filter(isActive);
   return{title:'Classes',actions:'<button class="ib" data-a="addClass" aria-label="Add class">'+ic('plus')+'</button>',
-    html:'<div class="wrap narrow">'+(l.length?'<div class="list">'+l.map(c=>'<div class="row"><button class="ib" data-a="colorClass" data-c="'+esc(c)+'" aria-label="Choose colour"><span class="cdot" style="--c:'+esc(state.classColors[c]||'')+'"></span></button><span class="grow"><b>'+esc(c)+'</b><small>'+act.filter(s=>memOf(s,c)).length+' active student'+(act.filter(s=>memOf(s,c)).length===1?'':'s')+classFeeText(c)+'</small></span><button class="ib" data-a="classFee" data-c="'+esc(c)+'" aria-label="Default fees">'+ic('card')+'</button><button class="ib" data-a="renameClass" data-c="'+esc(c)+'" aria-label="Rename">'+ic('edit')+'</button><button class="ib" data-a="retireClass" data-c="'+esc(c)+'" aria-label="Retire">'+ic('archive')+'</button></div>').join('')+'</div>':'<div class="empty">'+ic('layers')+'<b>No classes yet</b><small>Add a class to start enrolling students.</small></div>')+
+    html:'<div class="wrap narrow">'+(l.length?'<div class="list">'+l.map(c=>'<div class="row crow"><button class="ib" data-a="colorClass" data-c="'+esc(c)+'" aria-label="Choose colour"><span class="cdot" style="--c:'+esc(state.classColors[c]||'')+'"></span></button><span class="grow"><b>'+esc(c)+'</b><small>'+act.filter(s=>memOf(s,c)).length+' active student'+(act.filter(s=>memOf(s,c)).length===1?'':'s')+classFeeText(c)+'</small></span><button class="ib" data-a="classFee" data-c="'+esc(c)+'" aria-label="Default fees">'+ic('card')+'</button><button class="ib" data-a="renameClass" data-c="'+esc(c)+'" aria-label="Rename">'+ic('edit')+'</button><button class="ib" data-a="retireClass" data-c="'+esc(c)+'" aria-label="Retire">'+ic('archive')+'</button></div>').join('')+'</div>':'<div class="empty">'+ic('layers')+'<b>No classes yet</b><small>Add a class to start enrolling students.</small></div>')+
     '<button class="btn primary big" style="margin-top:1rem" data-a="addClass">'+ic('plus')+'Add class</button>'+
     (state.retiredClasses.length?'<div class="list" style="margin-top:1rem"><button class="row" data-a="retiredList"><span class="act-ic">'+ic('archive')+'</span><span class="grow"><b>Retired classes</b><small>'+state.retiredClasses.length+' with history you can still open</small></span>'+ic('chevR')+'</button></div>':'')+'</div>'};
 };
@@ -2543,128 +2616,7 @@ INP.restoreFile=async el=>{
   const text=await f.text();el.value='';await applyRestore(text);
 };
 
-/* =====================================================================
-   LEDGER
-   Debit  = money going out: an expense, or a payment to a person
-   Credit = money coming in from a person
-   Every person has their own ledger. Expenses have no person and can only be debits.
-   ===================================================================== */
-const personById=id=>state.people.find(p=>p.id===id);
-const entryTitle=e=>e.kind==='expense'?'Expense':(personById(e.personId)||{name:'Unknown person'}).name;
-const entryKind=e=>e.kind==='expense'?'Expense':e.kind==='pay'?'Paid':'Received';
-function personTotals(id,list){
-  let paid=0,got=0;(list||state.ledger).forEach(e=>{if(e.personId!==id)return;if(e.kind==='pay')paid+=+e.amount||0;else if(e.kind==='receive')got+=+e.amount||0});
-  return{paid:r2(paid),got:r2(got),net:r2(paid-got)};
-}
-const netText=n=>n===0?'Settled':(n>0?inr(n)+' paid':inr(-n)+' received');
-const receivedIn=ym=>r2(allTx().filter(x=>String(x.t.date).slice(0,7)===ym).reduce((a,x)=>a+(+x.t.amount||0),0));
-function monthFlow(ym){
-  const inM=e=>String(e.date).slice(0,7)===ym;
-  const credits=state.ledger.filter(e=>e.kind==='receive'&&inM(e)).reduce((a,e)=>a+(+e.amount||0),0);
-  const out=state.ledger.filter(e=>e.kind!=='receive'&&inM(e)).reduce((a,e)=>a+(+e.amount||0),0);
-  const inn=r2(receivedIn(ym)+credits);return{inn,out:r2(out),net:r2(inn-out)};
-}
-function addPerson(name){
-  const ex=state.people.find(p=>p.name.toLowerCase()===name.toLowerCase());if(ex)return ex.id;
-  const p={id:uid(),name};state.people.push(p);save();return p.id;
-}
-const entryRow=(e,title)=>'<button class="row" data-a="entryOpen" data-id="'+e.id+'"><span class="act-ic '+(e.kind==='receive'?'pay':'left')+'">'+ic(e.kind==='receive'?'up2':'down2')+'</span><span class="grow"><b>'+esc(title||e.remark||entryTitle(e))+'</b><small>'+fmtDate(e.date)+' · '+entryKind(e)+(title&&e.remark?' · '+esc(e.remark):'')+'</small></span><span class="end"><b class="num '+(e.kind==='receive'?'good':'')+'">'+(e.kind==='receive'?'+':'−')+inr(e.amount)+'</b></span></button>';
-const byDateDesc=(a,b)=>String(b.date).localeCompare(String(a.date));
-
-PAGES.ledger=function(){
-  const now=curYM(),f=monthFlow(now);
-  const ppl=state.people.map(p=>({p,t:personTotals(p.id),last:state.ledger.filter(e=>e.personId===p.id).sort(byDateDesc).map(e=>e.date)[0]||''})).sort((a,b)=>String(b.last).localeCompare(String(a.last))||coll.compare(a.p.name,b.p.name));
-  const exp=state.ledger.filter(e=>e.kind==='expense').sort(byDateDesc);
-  return{title:'Ledger',html:'<div class="wrap narrow"><small style="display:block;margin:0 .2rem .5rem">'+mLabel(now)+'</small><div class="stats3"><div class="stat"><small>Money in</small><b>'+inr(f.inn)+'</b></div><div class="stat"><small>Money out</small><b class="'+(f.out?'bal':'')+'">'+inr(f.out)+'</b></div><div class="stat"><small>Net</small><b class="'+(f.net<0?'bal':'')+'">'+inr(f.net)+'</b></div></div>'+
-    '<div class="sect"><h2>People</h2><button class="btn sm" data-a="personAdd">'+ic('plus')+'Add person</button></div>'+
-    (ppl.length?'<div class="list">'+ppl.map(x=>'<button class="row" data-a="personOpen" data-id="'+x.p.id+'">'+avatar(x.p.name,'')+'<span class="grow"><b>'+esc(x.p.name)+'</b><small>Paid '+inr(x.t.paid)+' · Received '+inr(x.t.got)+'</small></span><span class="end"><b class="num">'+netText(x.t.net)+'</b></span></button>').join('')+'</div>':'<div class="list"><div class="row"><small>No people yet. Add someone you pay or receive money from.</small></div></div>')+
-    '<div class="sect"><h2>Expenses</h2></div>'+(exp.length?'<div class="list">'+exp.map(e=>entryRow(e)).join('')+'</div>':'<div class="list"><div class="row"><small>No expenses yet.</small></div></div>')+
-    '</div><button class="fab" data-a="ledgerNew">'+ic('plus')+'New entry</button>'};
-};
-PAGES.person=function({id}){
-  const p=personById(id);
-  if(!p)return{title:'Person',html:'<div class="wrap"><div class="empty"><b>Person not found</b></div></div>'};
-  const t=personTotals(id),l=state.ledger.filter(e=>e.personId===id).sort(byDateDesc);
-  return{title:p.name,html:'<div class="wrap narrow"><div class="stats3"><div class="stat"><small>Paid</small><b>'+inr(t.paid)+'</b></div><div class="stat"><small>Received</small><b class="good">'+inr(t.got)+'</b></div><div class="stat"><small>'+(t.net<0?'Net received':'Net paid')+'</small><b>'+inr(Math.abs(t.net))+'</b></div></div>'+
-    '<div class="btns" style="margin:1rem 0"><button class="btn primary" data-a="entryNew" data-kind="pay" data-p="'+id+'">'+ic('down2')+'I paid</button><button class="btn" data-a="entryNew" data-kind="receive" data-p="'+id+'">'+ic('up2')+'I received</button></div>'+
-    '<div class="sect"><h2>Ledger</h2></div>'+(l.length?'<div class="list">'+l.map(e=>entryRow(e,e.remark||entryKind(e))).join('')+'</div>':'<div class="empty">'+ic('card')+'<b>No entries yet</b><small>Use I paid or I received to start this ledger.</small></div>')+
-    '<div class="btns" style="margin-top:1.6rem"><button class="btn sm" data-a="personRename" data-id="'+id+'">'+ic('edit')+'Rename</button><button class="btn sm danger" data-a="personDelete" data-id="'+id+'">'+ic('trash')+'Delete person</button></div></div>'};
-};
-PAGES.entryForm=function({id,kind,personId}){
-  const e=id?state.ledger.find(x=>x.id===id):null;
-  if(id&&!e)return{title:'Entry',html:'<div class="wrap"><div class="empty"><b>Entry not found</b></div></div>'};
-  const k=e?e.kind:kind,pid=e?e.personId:(personId||''),p=pid?personById(pid):null;
-  if(k!=='expense'&&!p)return{title:'Entry',html:'<div class="wrap"><div class="empty"><b>Person not found</b></div></div>'};
-  const head=k==='expense'?'Expense':k==='pay'?'Paying '+p.name:'Receiving from '+p.name;
-  const v=e||{amount:'',remark:'',date:today()};
-  return{title:e?'Edit entry':(k==='expense'?'Add expense':k==='pay'?'Add debit':'Add credit'),html:'<div class="wrap narrow"><div class="form">'+
-    '<div class="card" style="display:flex;align-items:center;gap:.8rem"><span class="act-ic '+(k==='receive'?'pay':'left')+'">'+ic(k==='receive'?'up2':'down2')+'</span><span class="grow"><b>'+esc(head)+'</b><small style="display:block">'+(k==='receive'?'Credit, money in':'Debit, money out')+'</small></span></div>'+
-    '<label class="f">Amount (₹)<input class="inp" id="d_amt" type="number" inputmode="decimal" min="0" step="any" value="'+esc(v.amount)+'" placeholder="0"></label>'+
-    '<label class="f">Remarks<input class="inp" id="d_rem" value="'+esc(v.remark)+'" placeholder="Optional" autocomplete="off"></label>'+
-    '<label class="f">Date<input class="inp" id="d_date" type="date" value="'+esc(v.date)+'"></label>'+
-    '<div class="savebar"><button class="btn primary big" data-a="saveEntry" data-id="'+(e?e.id:'')+'" data-kind="'+k+'" data-p="'+esc(pid)+'">Save</button>'+(e?'<button class="btn danger" data-a="delEntry" data-id="'+e.id+'">'+ic('trash')+'Delete</button>':'')+'</div></div></div>'};
-};
-ACT.saveEntry=el=>{
-  const amount=r2(num($('#d_amt').value)),date=$('#d_date').value,remark=$('#d_rem').value.trim(),id=el.dataset.id;
-  if(!(amount>0)){toast('Enter an amount greater than 0','err');$('#d_amt').focus();return}
-  if(!date){toast('Choose the date','err');return}
-  if(id){const e=state.ledger.find(x=>x.id===id);if(!e)return;Object.assign(e,{amount,remark,date})}
-  else{const kind=el.dataset.kind;state.ledger.push({id:uid(),date,amount,kind,personId:kind==='expense'?'':el.dataset.p,remark})}
-  save();toast(id?'Entry updated':'Entry saved');back();
-};
-ACT.delEntry=async el=>{
-  if(!await confirmDlg('Delete this entry?','It is removed from the ledger.','Delete'))return;
-  state.ledger=state.ledger.filter(x=>x.id!==el.dataset.id);save();toast('Entry deleted');back();
-};
-ACT.entryOpen=el=>go('entryForm',{id:el.dataset.id});
-ACT.entryNew=el=>go('entryForm',{kind:el.dataset.kind,personId:el.dataset.p});
-ACT.personOpen=el=>go('person',{id:el.dataset.id});
-ACT.personAdd=async()=>{
-  const n=await promptSheet({title:'New person',body:'Their name stays in your ledger so you can see everything with them.',label:'Name',placeholder:'For example, Ramesh'});
-  if(!n)return;const had=state.people.length;addPerson(n);toast(state.people.length>had?'Person added':'That person is already in your ledger');render(true);
-};
-ACT.personRename=async el=>{
-  const p=personById(el.dataset.id);if(!p)return;
-  const n=await promptSheet({title:'Rename',label:'Name',value:p.name});if(!n)return;
-  p.name=n;save();toast('Renamed');render(true);
-};
-ACT.personDelete=async el=>{
-  const p=personById(el.dataset.id);if(!p)return;const n=state.ledger.filter(e=>e.personId===p.id).length;
-  if(!await confirmDlg('Delete '+esc(p.name)+'?',n?'This also deletes their '+n+' ledger entr'+(n>1?'ies':'y')+'.':'They have no entries.','Delete person'))return;
-  state.ledger=state.ledger.filter(e=>e.personId!==p.id);state.people=state.people.filter(x=>x.id!==p.id);save();toast('Person deleted');back();
-};
-/* choose a person (or add one by name), then open the entry form */
-async function pickPerson(kind){
-  let pid=null;
-  if(state.people.length){
-    const c=await chooseSheet(kind==='pay'?'Pay whom?':'Received from whom?',state.people.slice().sort((a,b)=>coll.compare(a.name,b.name)).map(p=>({v:p.id,label:p.name,sub:netText(personTotals(p.id).net),icon:'user'})).concat([{v:'__new',label:'Add a new person',icon:'plus'}]));
-    if(!c)return;if(c!=='__new')pid=c;
-  }
-  if(!pid){
-    const n=await promptSheet({title:'New person',body:'Their name stays in your ledger so you can see everything with them.',label:'Name',placeholder:'For example, Ramesh'});
-    if(!n)return;pid=addPerson(n);
-  }
-  go('entryForm',{kind,personId:pid});
-}
-async function debitFlow(){
-  const c=await chooseSheet('Debit',[{v:'expense',label:'Expense',sub:'Rent, bills, materials and similar',icon:'card'},{v:'pay',label:'Pay someone',sub:'Staff or anyone else, kept in their ledger',icon:'user'}],'Money going out');
-  if(c==='expense')go('entryForm',{kind:'expense'});else if(c==='pay')await pickPerson('pay');
-}
-ACT.qaDebit=debitFlow;
-/* the "New entry" button on the Payments tab, and the one on the Ledger screen */
-ACT.payNew=async()=>{
-  const c=await chooseSheet('What are you recording?',[
-    {v:'fee',label:'Fee payment',sub:'Money received from a student',icon:'users'},
-    {v:'debit',label:'Debit',sub:'An expense, or a payment to someone',icon:'down2'},
-    {v:'credit',label:'Credit',sub:'Money received from a person',icon:'up2'}]);
-  if(c==='fee')go('payPick');else if(c==='debit')await debitFlow();else if(c==='credit')await pickPerson('receive');
-};
-ACT.ledgerNew=async()=>{
-  const c=await chooseSheet('New entry',[
-    {v:'debit',label:'Debit',sub:'An expense, or a payment to someone',icon:'down2'},
-    {v:'credit',label:'Credit',sub:'Money received from a person',icon:'up2'}]);
-  if(c==='debit')await debitFlow();else if(c==='credit')await pickPerson('receive');
-};
+ACT.payNew=()=>go('payPick');
 
 /* =====================================================================
    ABOUT & HELP
@@ -2673,15 +2625,14 @@ PAGES.about=function(){
   return{title:'About & Help',html:'<div class="wrap narrow help">'+
   '<h3>Your data stays on this device</h3><p>Tuition Manager has no account and no server. Students, fees, tests and attendance are stored in this browser only. Nobody else can see them, and nothing is uploaded unless you share it yourself.</p><p>The flip side: uninstalling the app or clearing browser data erases everything. Back up regularly.</p>'+
   '<h3>Students</h3><p>Add students with their classes, contacts and fee type (one-time total or monthly). Mark a student as left to keep their history, or delete them. Batch tools add or edit many at once.</p>'+
-  '<h3>Payments</h3><p>Record a payment from a student’s profile or the Payments tab. Share a receipt as an image, share a student’s fees with a parent as all transactions or a monthly breakdown, send a fee reminder on WhatsApp, or export your data to Excel.</p>'+
+  '<h3>Payments</h3><p>Record a payment from a student’s profile or with New payment on the Payments tab. That is the only thing recorded here; other accounts are kept outside the app. Share a receipt as an image, share a student’s fees with a parent as all transactions or a monthly breakdown, send a fee reminder on WhatsApp, or export your data to Excel.</p>'+
   '<h3>Tests</h3><p>Create a test and enter every student’s marks on one screen. Leave a mark blank for an absent student. A recorded 0 still counts in the average.</p>'+
-  '<h3>Attendance</h3><p>Everyone is present by default. Tap Mark absent for those who missed the day, or use Tuition off for a holiday. The monthly summary shows each student’s percentage.</p>'+
+  '<h3>Attendance</h3><p>Everyone is present by default. Tap Late or Absent beside a student; anyone you leave alone counts as present. A late student still counts as present in the monthly summary. Use Tuition off for a holiday.</p>'+
   '<h3>Classes and reports</h3><p>Rename a class and everything follows. Retire a class when it ends; its history stays available. Reports show subject performance, fee collection and attendance.</p>'+
   '<h3>Export to Excel</h3><p>Open the menu and choose Export to Excel (the download button on the Payments tab opens the same screen). Tick what you want: student details, payments, fee details, attendance and test history. Everything goes into one workbook with a sheet for each choice. The date range limits payments, attendance and tests.</p>'+
   '<h3>Fees, due day and overdue</h3><p>Set a default fee for each class on the Classes screen. It fills in when you add a student. Tick Free student for anyone who pays nothing. A fee below the class default shows as Discounted on the profile only, never in anything you share. Choose the fee due day in Settings: a fee counts as overdue only after that day passes, and Home and Alerts show just those overdue amounts.</p>'+
-  '<h3>Debits, credits and people</h3><p>On the Payments tab, tap New entry and choose Fee payment, Debit or Credit. A debit is money going out: choose Expense, or Pay someone and give their name. A credit is money you receive from a person. Every person has their own ledger of what you paid and received, and you can open all of them from the menu under Ledger. Expenses are debits only.</p>'+
   '<h3>Customize the home screen</h3><p>Open Settings and choose Customize home screen, then tick what to show. The bell icon always opens Alerts.</p>'+
-  '<h3>Absent message</h3><p>After saving attendance, tap the chat icon beside an absent student to message their parent on WhatsApp.</p>'+
+  '<h3>Share attendance with parents</h3><p>On the Attendance screen tap Share to class group. It saves the day, then opens your share sheet with a message listing who is present, absent (in bold) and late. Choose the class WhatsApp group there. To message one parent about an absence, tap the chat icon beside that student after saving.</p>'+
   '<h3>How do I back up my data?</h3><ol><li>Open the menu and choose Backup &amp; Restore.</li><li>Tap Backup data.</li><li>Choose Save to this phone, or Share to send the file through WhatsApp, Drive or email.</li><li>Keep the file somewhere safe.</li></ol>'+
   '<h3>How do I restore?</h3><ol><li>Open Backup &amp; Restore and tap Restore backup.</li><li>Pick your backup file and confirm. Restoring replaces everything on this device.</li></ol>'+
   '<h3>How do I connect Google Drive?</h3><ol><li>The app must be hosted over https with a Google client ID set in its code.</li><li>Open Backup &amp; Restore and tap Connect Google Drive.</li><li>Allow access. Then use Back up to Drive and Restore from Drive.</li></ol>'+
